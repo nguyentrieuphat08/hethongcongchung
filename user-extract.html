@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trích xuất Thông tin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar text-white p-0">
+                <div class="p-3">
+                    <h4 class="mb-4">MENU</h4>
+                    <div class="nav flex-column" id="mainMenu">
+                        <a href="admin-contract.html" class="nav-link text-white mb-2">
+                            <i class="bi bi-gear-fill me-2"></i>Quản lý Mẫu Hợp đồng
+                        </a>
+                        <a href="user-extract.html" class="nav-link text-white active mb-2">
+                            <i class="bi bi-card-image me-2"></i>Trích xuất thông tin
+                        </a>
+                        <a href="user-chat.html" class="nav-link text-white mb-2">
+                            <i class="bi bi-chat-dots-fill me-2"></i>Chat AI
+                        </a>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <small>Phiên bản 1.0</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 p-4 main-content">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="bg-white rounded shadow-sm p-4">
+                            <h4 class="mb-4">
+                                <i class="bi bi-cloud-upload me-2"></i>Trích xuất thông tin giấy tờ
+                            </h4>
+                            
+                            <div class="mb-4 text-center drop-zone" id="imageDropZone">
+                                <i class="bi bi-cloud-upload" style="font-size: 48px; color: #667eea;"></i>
+                                <p class="mt-3">Kéo thả hình ảnh vào đây<br>hoặc nhấn để chọn file</p>
+                                <p class="text-muted small">Hỗ trợ: JPG, PNG, GIF, WebP</p>
+                                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                            </div>
+
+                            <div id="imagePreview" class="mb-3" style="display: none;">
+                                <h6>Ảnh đã chọn (1)</h6>
+                                <div class="position-relative d-inline-block">
+                                    <img id="previewImg" class="img-thumbnail" style="max-width: 200px;">
+                                    <button class="btn btn-sm btn-danger position-absolute top-0 end-0" onclick="removeImage()" style="transform: translate(50%, -50%);">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" onclick="extractInfo()" id="extractBtn" disabled>
+                                    <i class="bi bi-gear me-2"></i>GỬI VÀ TRÍCH XUẤT
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearAll()">
+                                    <i class="bi bi-trash me-2"></i>XÓA TẤT CẢ
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="bg-white rounded shadow-sm p-4">
+                            <h4 class="mb-4">
+                                <i class="bi bi-file-text me-2"></i>Thông tin đã trích xuất
+                            </h4>
+                            
+                            <div id="extractedInfo">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>Chưa có thông tin nào được trích xuất
+                                </div>
+                            </div>
+
+                            <div id="extractedDetails" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Ảnh được xử lý:</label>
+                                    <div id="processedImage" class="alert alert-success">
+                                        <i class="bi bi-check-circle me-2"></i>Đã xử lý thành công
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="bi bi-person me-2"></i>Họ và tên:</label>
+                                        <input type="text" class="form-control" id="ext_fullname" readonly>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="bi bi-calendar-event me-2"></i>Ngày sinh:</label>
+                                        <input type="text" class="form-control" id="ext_birthday" readonly>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="bi bi-credit-card-2-front me-2"></i>Số CMND/CCCD:</label>
+                                        <input type="text" class="form-control" id="ext_idcard" readonly>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="bi bi-calendar-check me-2"></i>Ngày cấp:</label>
+                                        <input type="text" class="form-control" id="ext_issue_date" readonly>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="bi bi-calendar-x me-2"></i>Ngày hết hạn:</label>
+                                        <input type="text" class="form-control" id="ext_expiry_date" readonly>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label"><i class="bi bi-geo-alt me-2"></i>Địa chỉ:</label>
+                                        <input type="text" class="form-control" id="ext_address" readonly>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-success" onclick="downloadData()">
+                                        <i class="bi bi-download me-2"></i>Tải xuống
+                                    </button>
+                                    <button class="btn btn-primary" onclick="printData()">
+                                        <i class="bi bi-printer me-2"></i>In
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/user-extract.js"></script>
+</body>
+</html>

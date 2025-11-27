@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Mẫu Hợp đồng</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 sidebar text-white p-0">
+                <div class="p-3">
+                    <h4 class="mb-4">MENU</h4>
+                    <div class="nav flex-column" id="mainMenu">
+                        <a href="admin-contract.html" class="nav-link text-white active mb-2">
+                            <i class="bi bi-gear-fill me-2"></i>Quản lý Mẫu Hợp đồng
+                        </a>
+                        <a href="user-extract.html" class="nav-link text-white mb-2">
+                            <i class="bi bi-card-image me-2"></i>Trích xuất thông tin
+                        </a>
+                        <a href="user-chat.html" class="nav-link text-white mb-2">
+                            <i class="bi bi-chat-dots-fill me-2"></i>Chat AI
+                        </a>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <small>Phiên bản 1.0</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-10 p-4 main-content">
+                <div class="bg-white rounded shadow-sm p-4">
+                    <h3 class="mb-4">
+                        <i class="bi bi-file-earmark-text me-2"></i>Quản lý Mẫu Hợp đồng
+                    </h3>
+
+                    <!-- API Endpoint Info -->
+                    <div class="alert alert-info mb-4">
+                        <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>API Endpoint để n8n gửi hợp đồng</h6>
+                        <p class="mb-0"><strong>POST:</strong> <code id="apiEndpoint">window.location.origin + '/api/receive-contract'</code></p>
+                        <p class="mb-0 mt-2"><strong>Body:</strong> <code>{ "name": "Tên hợp đồng", "url": "https://drive.google.com/..." }</code></p>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Contract Selection and Editor -->
+                    <div class="row">
+                        <!-- Left Panel: Contract Selection & Placeholders -->
+                        <div class="col-md-3">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-file-text me-2"></i>Chọn hợp đồng
+                                </label>
+                                <select class="form-select" id="contractSelect" onchange="loadContract()">
+                                    <option value="">-- Chọn hợp đồng --</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-tags me-2"></i>Các biến Placeholder
+                                </label>
+                                <small class="d-block text-muted mb-2">Kéo thả vào hợp đồng bên phải</small>
+                            </div>
+
+                            <div id="placeholdersList">
+                                <div class="placeholder-item" draggable="true" data-field="fullname">
+                                    <i class="bi bi-person-fill me-2"></i>Họ và tên
+                                </div>
+                                <div class="placeholder-item" draggable="true" data-field="birthday">
+                                    <i class="bi bi-calendar-event me-2"></i>Ngày sinh
+                                </div>
+                                <div class="placeholder-item" draggable="true" data-field="idcard">
+                                    <i class="bi bi-credit-card-2-front me-2"></i>Số CMND/CCCD
+                                </div>
+                                <div class="placeholder-item" draggable="true" data-field="issue_date">
+                                    <i class="bi bi-calendar-check me-2"></i>Ngày cấp
+                                </div>
+                                <div class="placeholder-item" draggable="true" data-field="expiry_date">
+                                    <i class="bi bi-calendar-x me-2"></i>Ngày hết hạn
+                                </div>
+                                <div class="placeholder-item" draggable="true" data-field="address">
+                                    <i class="bi bi-geo-alt-fill me-2"></i>Địa chỉ
+                                </div>
+                                <div class="placeholder-item" draggable="true" data-field="phone">
+                                    <i class="bi bi-telephone-fill me-2"></i>Số điện thoại
+                                </div>
+                                <div class="placeholder-item" draggable="true" data-field="email">
+                                    <i class="bi bi-envelope-fill me-2"></i>Email
+                                </div>
+                            </div>
+
+                            <div class="mt-4">
+                                <button class="btn btn-success w-100" onclick="saveContractConfig()" id="saveBtn" disabled>
+                                    <i class="bi bi-save me-2"></i>Lưu cấu hình
+                                </button>
+                                <button class="btn btn-danger w-100 mt-2" onclick="clearAllMarkers()">
+                                    <i class="bi bi-trash me-2"></i>Xóa tất cả marker
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Contract Canvas -->
+                        <div class="col-md-9">
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-file-pdf me-2"></i>Hợp đồng mẫu
+                                </label>
+                            </div>
+
+                            <div id="contractCanvasWrapper">
+                                <div class="alert alert-secondary text-center">
+                                    <i class="bi bi-arrow-left-circle me-2"></i>
+                                    Chọn một hợp đồng từ menu bên trái để bắt đầu chỉnh sửa
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="js/admin-contract.js"></script>
+</body>
+</html>
