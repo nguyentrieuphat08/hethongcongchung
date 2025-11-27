@@ -8,8 +8,8 @@
   ],
   "routes": [
     {
-      "src": "/api/receive-contract",
-      "dest": "/api/receive-contract.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     }
   ],
   "headers": [
