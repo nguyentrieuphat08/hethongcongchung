@@ -165,21 +165,64 @@
                     </div>
                 </div>
 
-                <!-- Upload ảnh CCCD -->
+                <!-- Tab chọn loại giấy tờ -->
                 <div class="bg-white rounded shadow-sm p-4 mb-4">
                     <h5 class="mb-3">
-                        <i class="bi bi-cloud-upload-fill text-primary me-2"></i>
-                        Upload ảnh Giấy tờ
+                        <i class="bi bi-file-earmark-fill text-primary me-2"></i>
+                        Loại giấy tờ
                     </h5>
-                    <div id="uploadArea"></div>
+                    <ul class="nav nav-tabs" role="tablist" id="documentTypeTabs">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="cccd-tab" data-bs-toggle="tab" data-bs-target="#cccd-content" type="button" role="tab">
+                                <i class="bi bi-card-list me-2"></i>CCCD/CMND
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="other-tab" data-bs-toggle="tab" data-bs-target="#other-content" type="button" role="tab">
+                                <i class="bi bi-file-earmark me-2"></i>Các loại giấy tờ khác
+                            </button>
+                        </li>
+                    </ul>
+                </div>
 
-                    <div class="d-flex gap-2 mt-4">
-                        <button class="btn btn-primary" onclick="extractAllInfo()" id="extractBtn" disabled>
-                            <i class="bi bi-gear-fill me-2"></i>TRÍCH XUẤT THÔNG TIN
-                        </button>
-                        <button class="btn btn-secondary" onclick="clearAll()">
-                            <i class="bi bi-trash-fill me-2"></i>XÓA TẤT CẢ
-                        </button>
+                <!-- Upload ảnh CCCD -->
+                <div class="bg-white rounded shadow-sm p-4 mb-4">
+                    <div class="tab-content" id="documentTypeContent">
+                        <!-- Tab 1: CCCD -->
+                        <div class="tab-pane fade show active" id="cccd-content" role="tabpanel">
+                            <h5 class="mb-3">
+                                <i class="bi bi-cloud-upload-fill text-primary me-2"></i>
+                                Upload ảnh CCCD/CMND
+                            </h5>
+                            <div id="uploadAreaCCCD"></div>
+
+                            <div class="d-flex gap-2 mt-4">
+                                <button class="btn btn-primary" onclick="extractAllInfoCCCD()" id="extractBtnCCCD" disabled>
+                                    <i class="bi bi-gear-fill me-2"></i>TRÍCH XUẤT THÔNG TIN
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearAllCCCD()">
+                                    <i class="bi bi-trash-fill me-2"></i>XÓA TẤT CẢ
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab 2: Các loại giấy tờ khác -->
+                        <div class="tab-pane fade" id="other-content" role="tabpanel">
+                            <h5 class="mb-3">
+                                <i class="bi bi-cloud-upload-fill text-primary me-2"></i>
+                                Upload ảnh Giấy tờ
+                            </h5>
+                            <div id="uploadAreaOther"></div>
+
+                            <div class="d-flex gap-2 mt-4">
+                                <button class="btn btn-primary" onclick="extractAllInfoOther()" id="extractBtnOther" disabled>
+                                    <i class="bi bi-gear-fill me-2"></i>TRÍCH XUẤT THÔNG TIN
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearAllOther()">
+                                    <i class="bi bi-trash-fill me-2"></i>XÓA TẤT CẢ
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -190,23 +233,65 @@
                         Thông tin đã trích xuất
                     </h5>
                     
-                    <div id="extractedInfo">
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle me-2"></i>
-                            Chưa có thông tin nào được trích xuất. Vui lòng upload đầy đủ ảnh CCCD và nhấn "Trích xuất thông tin".
-                        </div>
-                    </div>
+                    <!-- Tab kết quả -->
+                    <ul class="nav nav-tabs mb-3" role="tablist" id="resultTabs">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="result-cccd-tab" data-bs-toggle="tab" data-bs-target="#result-cccd-content" type="button" role="tab">
+                                <i class="bi bi-card-list me-2"></i>CCCD/CMND
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="result-other-tab" data-bs-toggle="tab" data-bs-target="#result-other-content" type="button" role="tab">
+                                <i class="bi bi-file-earmark me-2"></i>Các loại giấy tờ khác
+                            </button>
+                        </li>
+                    </ul>
 
-                    <div id="extractedDetails" style="display: none;">
-                        <div id="extractedDataContainer"></div>
-                        
-                        <div class="d-flex gap-2 mt-4">
-                            <button class="btn btn-success" onclick="downloadData()">
-                                <i class="bi bi-download me-2"></i>Tải xuống
-                            </button>
-                            <button class="btn btn-primary" onclick="printData()">
-                                <i class="bi bi-printer-fill me-2"></i>In
-                            </button>
+                    <div class="tab-content" id="resultContent">
+                        <!-- CCCD Results -->
+                        <div class="tab-pane fade show active" id="result-cccd-content" role="tabpanel">
+                            <div id="extractedInfoCCCD">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Chưa có thông tin nào được trích xuất. Vui lòng upload đầy đủ ảnh CCCD và nhấn "Trích xuất thông tin".
+                                </div>
+                            </div>
+
+                            <div id="extractedDetailsCCCD" style="display: none;">
+                                <div id="extractedDataContainerCCCD"></div>
+                                
+                                <div class="d-flex gap-2 mt-4">
+                                    <button class="btn btn-success" onclick="downloadDataCCCD()">
+                                        <i class="bi bi-download me-2"></i>Tải xuống
+                                    </button>
+                                    <button class="btn btn-primary" onclick="printDataCCCD()">
+                                        <i class="bi bi-printer-fill me-2"></i>In
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Other Documents Results -->
+                        <div class="tab-pane fade" id="result-other-content" role="tabpanel">
+                            <div id="extractedInfoOther">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Chưa có thông tin nào được trích xuất. Vui lòng upload ảnh giấy tờ và nhấn "Trích xuất thông tin".
+                                </div>
+                            </div>
+
+                            <div id="extractedDetailsOther" style="display: none;">
+                                <div id="extractedDataContainerOther"></div>
+                                
+                                <div class="d-flex gap-2 mt-4">
+                                    <button class="btn btn-success" onclick="downloadDataOther()">
+                                        <i class="bi bi-download me-2"></i>Tải xuống
+                                    </button>
+                                    <button class="btn btn-primary" onclick="printDataOther()">
+                                        <i class="bi bi-printer-fill me-2"></i>In
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -217,25 +302,32 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // N8N API Configuration
-        const N8N_EXTRACT_API = 'https://demo.vnlawai.com/webhook/luongtaohopdong';
+        const N8N_EXTRACT_API_CCCD = 'https://demo.vnlawai.com/webhook/luongtaohopdong';
+        const N8N_EXTRACT_API_OTHER = 'https://demo.vnlawai.com/webhook/giaytokhac';
 
-        // State management
-        let parties = ['A', 'B'];
-        let images = {};
-        let extractedData = {};
+        // State management - CCCD
+        let partiesCCCD = ['A', 'B'];
+        let imagesCCCD = {};
+        let extractedDataCCCD = {};
+
+        // State management - Other documents
+        let partiesOther = ['A', 'B'];
+        let imagesOther = {};
+        let extractedDataOther = {};
 
         // Initialize
         window.addEventListener('load', () => {
             renderParties();
-            renderUploadArea();
+            renderUploadAreaCCCD();
+            renderUploadAreaOther();
         });
 
-        // Render danh sách đương sự
+        // ========== SHARED FUNCTIONS ==========
         function renderParties() {
             const container = document.getElementById('partiesList');
             container.innerHTML = '';
             
-            parties.forEach(party => {
+            partiesCCCD.forEach(party => {
                 const badge = document.createElement('div');
                 badge.className = 'party-badge';
                 badge.innerHTML = `
@@ -246,17 +338,20 @@
             });
         }
 
-        // Set default parties
         function setDefaultParties(num) {
-            parties = Array.from({length: num}, (_, i) => String.fromCharCode(65 + i));
-            images = {};
-            extractedData = {};
+            const parties = Array.from({length: num}, (_, i) => String.fromCharCode(65 + i));
+            partiesCCCD = [...parties];
+            partiesOther = [...parties];
+            imagesCCCD = {};
+            imagesOther = {};
+            extractedDataCCCD = {};
+            extractedDataOther = {};
             renderParties();
-            renderUploadArea();
-            hideExtractedData();
+            renderUploadAreaCCCD();
+            renderUploadAreaOther();
+            hideAllExtractedData();
         }
 
-        // Add party
         function addParty() {
             const input = document.getElementById('newPartyInput');
             const newParty = input.value.trim();
@@ -266,39 +361,44 @@
                 return;
             }
             
-            if (parties.includes(newParty)) {
+            if (partiesCCCD.includes(newParty)) {
                 alert('Tên đương sự đã tồn tại!');
                 return;
             }
             
-            parties.push(newParty);
+            partiesCCCD.push(newParty);
+            partiesOther.push(newParty);
             input.value = '';
             renderParties();
-            renderUploadArea();
+            renderUploadAreaCCCD();
+            renderUploadAreaOther();
         }
 
-        // Remove party
         function removeParty(party) {
-            if (parties.length <= 1) {
+            if (partiesCCCD.length <= 1) {
                 alert('Phải có ít nhất 1 đương sự!');
                 return;
             }
             
             if (confirm(`Bạn có chắc muốn xóa đương sự ${party}?`)) {
-                parties = parties.filter(p => p !== party);
-                delete images[party];
-                delete extractedData[party];
+                partiesCCCD = partiesCCCD.filter(p => p !== party);
+                partiesOther = partiesOther.filter(p => p !== party);
+                delete imagesCCCD[party];
+                delete imagesOther[party];
+                delete extractedDataCCCD[party];
+                delete extractedDataOther[party];
                 renderParties();
-                renderUploadArea();
+                renderUploadAreaCCCD();
+                renderUploadAreaOther();
             }
         }
 
-        // Render upload area
-        function renderUploadArea() {
-            const container = document.getElementById('uploadArea');
+        // ========== CCCD FUNCTIONS ==========
+        function renderUploadAreaCCCD() {
+            const container = document.getElementById('uploadAreaCCCD');
             container.innerHTML = '';
             
-            parties.forEach(party => {
+            partiesCCCD.forEach(party => {
                 const partyCard = document.createElement('div');
                 partyCard.className = 'party-card p-3 rounded mb-3';
                 
@@ -306,38 +406,36 @@
                 header.className = 'd-flex justify-content-between align-items-center mb-3';
                 header.innerHTML = `
                     <h6 class="mb-0 fw-bold">Đương sự ${party}</h6>
-                    <span class="badge bg-primary">${images[party] ? images[party].length : 0} ảnh</span>
+                    <span class="badge bg-primary">${imagesCCCD[party] ? imagesCCCD[party].length : 0} ảnh</span>
                 `;
                 
                 const imageGrid = document.createElement('div');
                 imageGrid.className = 'image-grid';
-                imageGrid.id = `imageGrid_${party}`;
+                imageGrid.id = `imageGridCCCD_${party}`;
                 
                 partyCard.appendChild(header);
                 partyCard.appendChild(imageGrid);
                 container.appendChild(partyCard);
                 
-                renderImages(party);
+                renderImagesCCCD(party);
             });
             
-            updateExtractButton();
+            updateExtractButtonCCCD();
         }
 
-        // Render images for a party
-        function renderImages(party) {
-            const grid = document.getElementById(`imageGrid_${party}`);
+        function renderImagesCCCD(party) {
+            const grid = document.getElementById(`imageGridCCCD_${party}`);
             if (!grid) return;
             
             grid.innerHTML = '';
-            const partyImages = images[party] || [];
+            const partyImages = imagesCCCD[party] || [];
             
-            // Render existing images
             partyImages.forEach((image, index) => {
                 const imageItem = document.createElement('div');
                 imageItem.className = 'image-item';
                 imageItem.innerHTML = `
                     <img src="${image.dataUrl}" alt="Ảnh ${index + 1}">
-                    <button class="btn btn-sm btn-danger remove-btn" onclick="removeImage('${party}', ${index})">
+                    <button class="btn btn-sm btn-danger remove-btn" onclick="removeImageCCCD('${party}', ${index})">
                         <i class="bi bi-x-lg"></i>
                     </button>
                     <div class="image-label">Ảnh ${index + 1}</div>
@@ -345,11 +443,10 @@
                 grid.appendChild(imageItem);
             });
             
-            // Add button
             const addBtn = document.createElement('label');
             addBtn.className = 'add-image-btn';
             addBtn.innerHTML = `
-                <input type="file" style="display: none;" onchange="handleImageUpload('${party}', this)">
+                <input type="file" style="display: none;" onchange="handleImageUploadCCCD('${party}', this)">
                 <div class="text-center">
                     <i class="bi bi-plus-lg" style="font-size: 24px; color: #6c757d;"></i>
                     <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">Thêm ảnh</div>
@@ -358,12 +455,10 @@
             grid.appendChild(addBtn);
         }
 
-        // Handle image upload
-        function handleImageUpload(party, input) {
+        function handleImageUploadCCCD(party, input) {
             const file = input.files[0];
             if (!file) return;
             
-            // Accept any file type - no validation on file type
             if (file.size > 10 * 1024 * 1024) {
                 alert('File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.');
                 input.value = '';
@@ -372,65 +467,61 @@
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                if (!images[party]) {
-                    images[party] = [];
+                if (!imagesCCCD[party]) {
+                    imagesCCCD[party] = [];
                 }
                 
-                images[party].push({
+                imagesCCCD[party].push({
                     file: file,
                     dataUrl: e.target.result,
                     base64: e.target.result.split(',')[1]
                 });
                 
-                renderImages(party);
-                updateExtractButton();
+                renderImagesCCCD(party);
+                updateExtractButtonCCCD();
             };
             reader.readAsDataURL(file);
-            
             input.value = '';
         }
 
-        // Remove image
-        function removeImage(party, index) {
-            if (images[party]) {
-                images[party].splice(index, 1);
-                if (images[party].length === 0) {
-                    delete images[party];
+        function removeImageCCCD(party, index) {
+            if (imagesCCCD[party]) {
+                imagesCCCD[party].splice(index, 1);
+                if (imagesCCCD[party].length === 0) {
+                    delete imagesCCCD[party];
                 }
-                renderImages(party);
-                updateExtractButton();
+                renderImagesCCCD(party);
+                updateExtractButtonCCCD();
             }
         }
 
-        // Update extract button state
-        function updateExtractButton() {
-            const extractBtn = document.getElementById('extractBtn');
-            const canExtract = parties.some(party => images[party] && images[party].length >= 1);
+        function updateExtractButtonCCCD() {
+            const extractBtn = document.getElementById('extractBtnCCCD');
+            const canExtract = partiesCCCD.some(party => imagesCCCD[party] && imagesCCCD[party].length >= 1);
             extractBtn.disabled = !canExtract;
         }
 
-        // Extract all info
-        async function extractAllInfo() {
-            const extractBtn = document.getElementById('extractBtn');
+        async function extractAllInfoCCCD() {
+            const extractBtn = document.getElementById('extractBtnCCCD');
             extractBtn.disabled = true;
             extractBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
             
             try {
-                extractedData = {};
+                extractedDataCCCD = {};
                 
-                for (const party of parties) {
-                    const partyImages = images[party] || [];
+                for (const party of partiesCCCD) {
+                    const partyImages = imagesCCCD[party] || [];
                     
                     if (partyImages.length >= 1) {
-                        const data = await callN8nExtractAPI(party, partyImages);
-                        extractedData[party] = data;
+                        const data = await callN8nExtractAPI(party, partyImages, 'CCCD');
+                        extractedDataCCCD[party] = data;
                     }
                 }
                 
-                if (Object.keys(extractedData).length === 0) {
+                if (Object.keys(extractedDataCCCD).length === 0) {
                     alert('Vui lòng upload ít nhất 1 ảnh cho mỗi đương sự!');
                 } else {
-                    displayExtractedData();
+                    displayExtractedDataCCCD();
                 }
             } catch (error) {
                 console.error('Error extracting info:', error);
@@ -441,50 +532,13 @@
             }
         }
 
-        // Call N8N API
-        async function callN8nExtractAPI(party, partyImages) {
-            try {
-                const response = await fetch(N8N_EXTRACT_API, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        party: party,
-                        images: partyImages.map(img => ({
-                            name: img.file.name,
-                            base64: img.base64
-                        }))
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`API request failed with status ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                // Handle both success: true and direct data return
-                if (data.success === false) {
-                    throw new Error(data.message || 'API returned error');
-                }
-                
-                // If data has a data property (our format), use it; otherwise use the data directly
-                return data.data || data;
-            } catch (error) {
-                console.error('Error calling extract API:', error);
-                throw error;
-            }
-        }
-
-        // Display extracted data
-        function displayExtractedData() {
-            const container = document.getElementById('extractedDataContainer');
+        function displayExtractedDataCCCD() {
+            const container = document.getElementById('extractedDataContainerCCCD');
             container.innerHTML = '';
             
-            parties.forEach(party => {
-                if (extractedData[party]) {
-                    const data = extractedData[party];
+            partiesCCCD.forEach(party => {
+                if (extractedDataCCCD[party]) {
+                    const data = extractedDataCCCD[party];
                     const card = document.createElement('div');
                     card.className = 'border rounded p-3 mb-3';
                     card.innerHTML = `
@@ -522,64 +576,60 @@
                 }
             });
             
-            document.getElementById('extractedInfo').style.display = 'none';
-            document.getElementById('extractedDetails').style.display = 'block';
+            document.getElementById('extractedInfoCCCD').style.display = 'none';
+            document.getElementById('extractedDetailsCCCD').style.display = 'block';
         }
 
-        // Hide extracted data
-        function hideExtractedData() {
-            document.getElementById('extractedInfo').style.display = 'block';
-            document.getElementById('extractedDetails').style.display = 'none';
-        }
-
-        // Clear all
-        function clearAll() {
+        function clearAllCCCD() {
             if (confirm('Bạn có chắc muốn xóa tất cả dữ liệu?')) {
-                images = {};
-                extractedData = {};
-                renderUploadArea();
-                hideExtractedData();
+                imagesCCCD = {};
+                extractedDataCCCD = {};
+                renderUploadAreaCCCD();
+                hideExtractedDataCCCD();
             }
         }
 
-        // Download data
-        function downloadData() {
-            if (Object.keys(extractedData).length === 0) return;
+        function hideExtractedDataCCCD() {
+            document.getElementById('extractedInfoCCCD').style.display = 'block';
+            document.getElementById('extractedDetailsCCCD').style.display = 'none';
+        }
+
+        function downloadDataCCCD() {
+            if (Object.keys(extractedDataCCCD).length === 0) return;
             
-            const dataStr = JSON.stringify(extractedData, null, 2);
+            const dataStr = JSON.stringify(extractedDataCCCD, null, 2);
             const dataBlob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(dataBlob);
             
             const link = document.createElement('a');
             link.href = url;
-            link.download = 'thong-tin-trich-xuat.json';
+            link.download = 'thong-tin-cccd-' + Date.now() + '.json';
             link.click();
             
             URL.revokeObjectURL(url);
         }
 
-        // Print data
-        function printData() {
-            if (Object.keys(extractedData).length === 0) return;
+        function printDataCCCD() {
+            if (Object.keys(extractedDataCCCD).length === 0) return;
             
             const printWindow = window.open('', '', 'height=600,width=800');
-            printWindow.document.write('<html><head><title>Thông tin trích xuất</title>');
+            printWindow.document.write('<html><head><title>Thông tin CCCD</title>');
             printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
             printWindow.document.write('</head><body>');
             printWindow.document.write('<div class="container mt-4">');
-            printWindow.document.write('<h2>Thông tin đã trích xuất</h2>');
+            printWindow.document.write('<h2>Thông tin CCCD/CMND</h2>');
             
-            parties.forEach(party => {
-                if (extractedData[party]) {
-                    const data = extractedData[party];
+            partiesCCCD.forEach(party => {
+                if (extractedDataCCCD[party]) {
+                    const data = extractedDataCCCD[party];
                     printWindow.document.write(`<h4 class="mt-4">Đương sự ${party}</h4>`);
                     printWindow.document.write('<table class="table table-bordered">');
-                    printWindow.document.write('<tr><th>Họ và tên</th><td>' + data.fullname + '</td></tr>');
-                    printWindow.document.write('<tr><th>Ngày sinh</th><td>' + data.birthday + '</td></tr>');
-                    printWindow.document.write('<tr><th>Số CMND/CCCD</th><td>' + data.idcard + '</td></tr>');
-                    printWindow.document.write('<tr><th>Ngày cấp</th><td>' + data.issue_date + '</td></tr>');
-                    printWindow.document.write('<tr><th>Ngày hết hạn</th><td>' + data.expiry_date + '</td></tr>');
-                    printWindow.document.write('<tr><th>Địa chỉ</th><td>' + data.address + '</td></tr>');
+                    printWindow.document.write('<tr><th>Họ và tên</th><td>' + (data.fullname || '') + '</td></tr>');
+                    printWindow.document.write('<tr><th>Ngày sinh</th><td>' + (data.birthday || '') + '</td></tr>');
+                    printWindow.document.write('<tr><th>Số CMND/CCCD</th><td>' + (data.idcard || '') + '</td></tr>');
+                    printWindow.document.write('<tr><th>Ngày cấp</th><td>' + (data.issue_date || '') + '</td></tr>');
+                    printWindow.document.write('<tr><th>Ngày hết hạn</th><td>' + (data.expiry_date || '') + '</td></tr>');
+                    printWindow.document.write('<tr><th>Địa chỉ</th><td>' + (data.address || '') + '</td></tr>');
                     printWindow.document.write('</table>');
                 }
             });
@@ -588,6 +638,295 @@
             printWindow.document.write('</body></html>');
             printWindow.document.close();
             printWindow.print();
+        }
+
+        // ========== OTHER DOCUMENTS FUNCTIONS ==========
+        function renderUploadAreaOther() {
+            const container = document.getElementById('uploadAreaOther');
+            container.innerHTML = '';
+            
+            partiesOther.forEach(party => {
+                const partyCard = document.createElement('div');
+                partyCard.className = 'party-card p-3 rounded mb-3';
+                
+                const header = document.createElement('div');
+                header.className = 'd-flex justify-content-between align-items-center mb-3';
+                header.innerHTML = `
+                    <h6 class="mb-0 fw-bold">Đương sự ${party}</h6>
+                    <span class="badge bg-primary">${imagesOther[party] ? imagesOther[party].length : 0} ảnh</span>
+                `;
+                
+                const imageGrid = document.createElement('div');
+                imageGrid.className = 'image-grid';
+                imageGrid.id = `imageGridOther_${party}`;
+                
+                partyCard.appendChild(header);
+                partyCard.appendChild(imageGrid);
+                container.appendChild(partyCard);
+                
+                renderImagesOther(party);
+            });
+            
+            updateExtractButtonOther();
+        }
+
+        function renderImagesOther(party) {
+            const grid = document.getElementById(`imageGridOther_${party}`);
+            if (!grid) return;
+            
+            grid.innerHTML = '';
+            const partyImages = imagesOther[party] || [];
+            
+            partyImages.forEach((image, index) => {
+                const imageItem = document.createElement('div');
+                imageItem.className = 'image-item';
+                imageItem.innerHTML = `
+                    <img src="${image.dataUrl}" alt="Ảnh ${index + 1}">
+                    <button class="btn btn-sm btn-danger remove-btn" onclick="removeImageOther('${party}', ${index})">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                    <div class="image-label">Ảnh ${index + 1}</div>
+                `;
+                grid.appendChild(imageItem);
+            });
+            
+            const addBtn = document.createElement('label');
+            addBtn.className = 'add-image-btn';
+            addBtn.innerHTML = `
+                <input type="file" style="display: none;" onchange="handleImageUploadOther('${party}', this)">
+                <div class="text-center">
+                    <i class="bi bi-plus-lg" style="font-size: 24px; color: #6c757d;"></i>
+                    <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">Thêm ảnh</div>
+                </div>
+            `;
+            grid.appendChild(addBtn);
+        }
+
+        function handleImageUploadOther(party, input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.');
+                input.value = '';
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (!imagesOther[party]) {
+                    imagesOther[party] = [];
+                }
+                
+                imagesOther[party].push({
+                    file: file,
+                    dataUrl: e.target.result,
+                    base64: e.target.result.split(',')[1]
+                });
+                
+                renderImagesOther(party);
+                updateExtractButtonOther();
+            };
+            reader.readAsDataURL(file);
+            input.value = '';
+        }
+
+        function removeImageOther(party, index) {
+            if (imagesOther[party]) {
+                imagesOther[party].splice(index, 1);
+                if (imagesOther[party].length === 0) {
+                    delete imagesOther[party];
+                }
+                renderImagesOther(party);
+                updateExtractButtonOther();
+            }
+        }
+
+        function updateExtractButtonOther() {
+            const extractBtn = document.getElementById('extractBtnOther');
+            const canExtract = partiesOther.some(party => imagesOther[party] && imagesOther[party].length >= 1);
+            extractBtn.disabled = !canExtract;
+        }
+
+        async function extractAllInfoOther() {
+            const extractBtn = document.getElementById('extractBtnOther');
+            extractBtn.disabled = true;
+            extractBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+            
+            try {
+                extractedDataOther = {};
+                
+                for (const party of partiesOther) {
+                    const partyImages = imagesOther[party] || [];
+                    
+                    if (partyImages.length >= 1) {
+                        const data = await callN8nExtractAPI(party, partyImages, 'OTHER');
+                        extractedDataOther[party] = data;
+                    }
+                }
+                
+                if (Object.keys(extractedDataOther).length === 0) {
+                    alert('Vui lòng upload ít nhất 1 ảnh cho mỗi đương sự!');
+                } else {
+                    displayExtractedDataOther();
+                }
+            } catch (error) {
+                console.error('Error extracting info:', error);
+                alert('Lỗi khi trích xuất thông tin: ' + error.message);
+            } finally {
+                extractBtn.disabled = false;
+                extractBtn.innerHTML = '<i class="bi bi-gear-fill me-2"></i>TRÍCH XUẤT THÔNG TIN';
+            }
+        }
+
+        function displayExtractedDataOther() {
+            const container = document.getElementById('extractedDataContainerOther');
+            container.innerHTML = '';
+            
+            partiesOther.forEach(party => {
+                if (extractedDataOther[party]) {
+                    const data = extractedDataOther[party];
+                    const card = document.createElement('div');
+                    card.className = 'border rounded p-3 mb-3';
+                    
+                    let fieldHTML = `
+                        <h6 class="fw-bold text-success mb-3">
+                            <i class="bi bi-check-circle-fill me-2"></i>Thông tin Đương sự ${party}
+                        </h6>
+                        <div class="row">
+                    `;
+                    
+                    // Dynamic fields from n8n response
+                    Object.entries(data).forEach(([key, value]) => {
+                        // Convert camelCase or snake_case to readable label
+                        const label = key
+                            .replace(/([A-Z])/g, ' $1')
+                            .replace(/_/g, ' ')
+                            .replace(/^./, str => str.toUpperCase());
+                        
+                        fieldHTML += `
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label small text-muted">${label}:</label>
+                                <input type="text" class="form-control form-control-sm" value="${value || ''}" readonly>
+                            </div>
+                        `;
+                    });
+                    
+                    fieldHTML += '</div>';
+                    card.innerHTML = fieldHTML;
+                    container.appendChild(card);
+                }
+            });
+            
+            document.getElementById('extractedInfoOther').style.display = 'none';
+            document.getElementById('extractedDetailsOther').style.display = 'block';
+        }
+
+        function clearAllOther() {
+            if (confirm('Bạn có chắc muốn xóa tất cả dữ liệu?')) {
+                imagesOther = {};
+                extractedDataOther = {};
+                renderUploadAreaOther();
+                hideExtractedDataOther();
+            }
+        }
+
+        function hideExtractedDataOther() {
+            document.getElementById('extractedInfoOther').style.display = 'block';
+            document.getElementById('extractedDetailsOther').style.display = 'none';
+        }
+
+        function downloadDataOther() {
+            if (Object.keys(extractedDataOther).length === 0) return;
+            
+            const dataStr = JSON.stringify(extractedDataOther, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'thong-tin-giay-to-' + Date.now() + '.json';
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
+        function printDataOther() {
+            if (Object.keys(extractedDataOther).length === 0) return;
+            
+            const printWindow = window.open('', '', 'height=600,width=800');
+            printWindow.document.write('<html><head><title>Thông tin Giấy tờ</title>');
+            printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
+            printWindow.document.write('</head><body>');
+            printWindow.document.write('<div class="container mt-4">');
+            printWindow.document.write('<h2>Thông tin Giấy tờ</h2>');
+            
+            partiesOther.forEach(party => {
+                if (extractedDataOther[party]) {
+                    const data = extractedDataOther[party];
+                    printWindow.document.write(`<h4 class="mt-4">Đương sự ${party}</h4>`);
+                    printWindow.document.write('<table class="table table-bordered">');
+                    
+                    Object.entries(data).forEach(([key, value]) => {
+                        const label = key
+                            .replace(/([A-Z])/g, ' $1')
+                            .replace(/_/g, ' ')
+                            .replace(/^./, str => str.toUpperCase());
+                        printWindow.document.write(`<tr><th>${label}</th><td>${value || ''}</td></tr>`);
+                    });
+                    
+                    printWindow.document.write('</table>');
+                }
+            });
+            
+            printWindow.document.write('</div>');
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        // ========== SHARED API CALL ==========
+        async function callN8nExtractAPI(party, partyImages, docType = 'CCCD') {
+            try {
+                // Select appropriate webhook based on document type
+                const apiUrl = docType === 'OTHER' ? N8N_EXTRACT_API_OTHER : N8N_EXTRACT_API_CCCD;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        party: party,
+                        documentType: docType,
+                        images: partyImages.map(img => ({
+                            name: img.file.name,
+                            base64: img.base64
+                        }))
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success === false) {
+                    throw new Error(data.message || 'API returned error');
+                }
+                
+                return data.data || data;
+            } catch (error) {
+                console.error('Error calling extract API:', error);
+                throw error;
+            }
+        }
+
+        // Hide all extracted data
+        function hideAllExtractedData() {
+            hideExtractedDataCCCD();
+            hideExtractedDataOther();
         }
     </script>
 </body>
