@@ -122,9 +122,9 @@
                 <div class="bg-white rounded shadow-sm p-4 mb-4">
                     <h3 class="mb-2">
                         <i class="bi bi-file-text-fill text-primary me-2"></i>
-                        Hệ thống Trích xuất Thông tin CCCD
+                        Hệ thống Trích xuất Thông tin Giấy tờ
                     </h3>
-                    <p class="text-muted mb-0">Upload ảnh CCCD để tự động trích xuất thông tin</p>
+                    <p class="text-muted mb-0">Upload ảnh giấy tờ bất kỳ để tự động trích xuất thông tin</p>
                 </div>
 
                 <!-- Quản lý Đương sự -->
@@ -169,7 +169,7 @@
                 <div class="bg-white rounded shadow-sm p-4 mb-4">
                     <h5 class="mb-3">
                         <i class="bi bi-cloud-upload-fill text-primary me-2"></i>
-                        Upload ảnh CCCD
+                        Upload ảnh Giấy tờ
                     </h5>
                     <div id="uploadArea"></div>
 
@@ -349,7 +349,7 @@
             const addBtn = document.createElement('label');
             addBtn.className = 'add-image-btn';
             addBtn.innerHTML = `
-                <input type="file" accept="image/*" style="display: none;" onchange="handleImageUpload('${party}', this)">
+                <input type="file" style="display: none;" onchange="handleImageUpload('${party}', this)">
                 <div class="text-center">
                     <i class="bi bi-plus-lg" style="font-size: 24px; color: #6c757d;"></i>
                     <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">Thêm ảnh</div>
@@ -363,14 +363,9 @@
             const file = input.files[0];
             if (!file) return;
             
-            if (!file.type.startsWith('image/')) {
-                alert('Vui lòng chọn file hình ảnh!');
-                input.value = '';
-                return;
-            }
-            
-            if (file.size > 5 * 1024 * 1024) {
-                alert('File quá lớn! Vui lòng chọn file nhỏ hơn 5MB.');
+            // Accept any file type - no validation on file type
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File quá lớn! Vui lòng chọn file nhỏ hơn 10MB.');
                 input.value = '';
                 return;
             }
@@ -410,7 +405,7 @@
         // Update extract button state
         function updateExtractButton() {
             const extractBtn = document.getElementById('extractBtn');
-            const canExtract = parties.some(party => images[party] && images[party].length >= 2);
+            const canExtract = parties.some(party => images[party] && images[party].length >= 1);
             extractBtn.disabled = !canExtract;
         }
 
@@ -426,14 +421,14 @@
                 for (const party of parties) {
                     const partyImages = images[party] || [];
                     
-                    if (partyImages.length >= 2) {
+                    if (partyImages.length >= 1) {
                         const data = await callN8nExtractAPI(party, partyImages);
                         extractedData[party] = data;
                     }
                 }
                 
                 if (Object.keys(extractedData).length === 0) {
-                    alert('Vui lòng upload ít nhất 2 ảnh cho mỗi đương sự!');
+                    alert('Vui lòng upload ít nhất 1 ảnh cho mỗi đương sự!');
                 } else {
                     displayExtractedData();
                 }
