@@ -217,7 +217,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // N8N API Configuration
-        const N8N_EXTRACT_API = 'https://hethongcongchung.vercel.app/api/extract-party-info';
+        const N8N_EXTRACT_API = 'https://demo.vnlawai.com/webhook/luongtaohopdong';
 
         // State management
         let parties = ['A', 'B'];
@@ -456,7 +456,10 @@
                     },
                     body: JSON.stringify({
                         party: party,
-                        images: partyImages.map(img => img.base64)
+                        images: partyImages.map(img => ({
+                            name: img.file.name,
+                            base64: img.base64
+                        }))
                     })
                 });
                 
@@ -465,11 +468,14 @@
                 }
                 
                 const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.message || 'Unknown error');
+                
+                // Handle both success: true and direct data return
+                if (data.success === false) {
+                    throw new Error(data.message || 'API returned error');
                 }
                 
-                return data.data;
+                // If data has a data property (our format), use it; otherwise use the data directly
+                return data.data || data;
             } catch (error) {
                 console.error('Error calling extract API:', error);
                 throw error;
