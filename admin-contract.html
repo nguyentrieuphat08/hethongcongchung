@@ -70,17 +70,27 @@
         }
         .field-marker {
             position: absolute;
-            background-color: rgba(255, 255, 255, 0.95);
+            background-color: transparent;
             color: #000;
-            padding: 2px 6px;
-            border: 1px solid #667eea;
-            border-radius: 2px;
+            padding: 2px 4px;
+            border: none;
             font-family: 'Times New Roman', Times, serif;
             font-size: 13px;
-            cursor: move;
+            cursor: default;
             white-space: nowrap;
             z-index: 100;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+        .field-marker:hover {
+            background-color: rgba(102, 126, 234, 0.1);
+            border: 1px dashed #667eea;
+            cursor: move;
+            border-radius: 2px;
+        }
+        .field-marker .remove-marker {
+            display: none;
+        }
+        .field-marker:hover .remove-marker {
+            display: inline;
         }
         .field-marker .remove-marker {
             margin-left: 8px;
@@ -820,8 +830,7 @@
                 div.style.left = marker.x + 'px';
                 div.style.top = marker.y + 'px';
                 div.innerHTML = `
-                    ${marker.sampleData || marker.label}
-                    <i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="removeMarker('${marker.id}')"></i>
+                    <span class="marker-text">${marker.sampleData || marker.label}</span><i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="removeMarker('${marker.id}')"></i>
                 `;
                 
                 // Make draggable to reposition
