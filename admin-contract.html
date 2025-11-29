@@ -280,10 +280,14 @@
                                             <option value="'Palatino Linotype', serif">Palatino</option>
                                         </select>
                                     </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Cỡ chữ gốc (pt)</label>
+                                        <input type="number" class="form-control form-control-sm" id="fontSize" value="14" min="8" max="36" onchange="updateFontSettings()">
+                                    </div>
                                     <div>
-                                        <label class="form-label small mb-1">Cỡ chữ gốc (px)</label>
-                                        <input type="number" class="form-control form-control-sm" id="fontSize" value="13" min="8" max="36" onchange="updateFontSettings()">
-                                        <small class="text-muted">Sẽ tự động scale theo PDF</small>
+                                        <label class="form-label small mb-1">Hệ số scale</label>
+                                        <input type="number" class="form-control form-control-sm" id="fontScale" value="1.5" min="0.5" max="3" step="0.1" onchange="updateFontSettings()">
+                                        <small class="text-muted">PDF: 1.5 | Word: 1.0-1.33</small>
                                     </div>
                                 </div>
                             </div>
@@ -395,7 +399,8 @@
         let markers = [];
         let fontSettings = {
             fontFamily: "'Times New Roman', Times, serif",
-            fontSize: 13
+            fontSize: 14,
+            fontScale: 1.5
         };
         let pdfScale = 1.5; // PDF render scale
         
@@ -426,6 +431,7 @@
                 fontSettings = JSON.parse(saved);
                 document.getElementById('fontFamily').value = fontSettings.fontFamily;
                 document.getElementById('fontSize').value = fontSettings.fontSize;
+                document.getElementById('fontScale').value = fontSettings.fontScale || 1.5;
             }
         }
 
@@ -435,7 +441,8 @@
 
         function updateFontSettings() {
             fontSettings.fontFamily = document.getElementById('fontFamily').value;
-            fontSettings.fontSize = parseInt(document.getElementById('fontSize').value) || 13;
+            fontSettings.fontSize = parseInt(document.getElementById('fontSize').value) || 14;
+            fontSettings.fontScale = parseFloat(document.getElementById('fontScale').value) || 1.5;
             saveFontSettings();
             renderMarkers();
         }
@@ -1101,8 +1108,8 @@
                 div.style.left = marker.x + 'px';
                 div.style.top = marker.y + 'px';
                 div.style.fontFamily = fontSettings.fontFamily;
-                // Apply scale to font size so it matches PDF text
-                div.style.fontSize = (fontSettings.fontSize * pdfScale) + 'px';
+                // Apply scale to font size so it matches document text
+                div.style.fontSize = (fontSettings.fontSize * fontSettings.fontScale) + 'px';
                 div.innerHTML = `
                     <span class="marker-text">${marker.sampleData || marker.label}</span><i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="event.stopPropagation(); removeMarker('${marker.id}')"></i>
                 `;
