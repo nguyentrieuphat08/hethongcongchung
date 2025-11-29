@@ -70,15 +70,17 @@
         }
         .field-marker {
             position: absolute;
-            background-color: rgba(102, 126, 234, 0.9);
-            color: white;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 12px;
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #000;
+            padding: 2px 6px;
+            border: 1px solid #667eea;
+            border-radius: 2px;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 13px;
             cursor: move;
             white-space: nowrap;
             z-index: 100;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
         }
         .field-marker .remove-marker {
             margin-left: 8px;
@@ -208,6 +210,9 @@
                                 <div class="input-group input-group-sm mb-2">
                                     <input type="text" class="form-control" id="newPlaceholderField" placeholder="Tên biến (VD: so_hop_dong)">
                                 </div>
+                                <div class="input-group input-group-sm mb-2">
+                                    <input type="text" class="form-control" id="newPlaceholderSample" placeholder="Dữ liệu mẫu (VD: HD-001)">
+                                </div>
                                 <button class="btn btn-success btn-sm w-100" onclick="addCustomPlaceholder()">
                                     <i class="bi bi-plus-lg me-1"></i>Thêm Placeholder
                                 </button>
@@ -296,16 +301,16 @@
             'https://proxy.cors.sh/'
         ];
 
-        // Default placeholders
+        // Default placeholders with sample data
         const DEFAULT_PLACEHOLDERS = [
-            { field: 'fullname', label: 'Họ và tên', icon: 'bi-person-fill', isDefault: true },
-            { field: 'birthday', label: 'Ngày sinh', icon: 'bi-calendar-event', isDefault: true },
-            { field: 'idcard', label: 'Số CMND/CCCD', icon: 'bi-credit-card-2-front', isDefault: true },
-            { field: 'issue_date', label: 'Ngày cấp', icon: 'bi-calendar-check', isDefault: true },
-            { field: 'expiry_date', label: 'Ngày hết hạn', icon: 'bi-calendar-x', isDefault: true },
-            { field: 'address', label: 'Địa chỉ', icon: 'bi-geo-alt-fill', isDefault: true },
-            { field: 'phone', label: 'Số điện thoại', icon: 'bi-telephone-fill', isDefault: true },
-            { field: 'email', label: 'Email', icon: 'bi-envelope-fill', isDefault: true }
+            { field: 'fullname', label: 'Họ và tên', icon: 'bi-person-fill', isDefault: true, sampleData: 'Nguyễn Văn A' },
+            { field: 'birthday', label: 'Ngày sinh', icon: 'bi-calendar-event', isDefault: true, sampleData: '01/01/1990' },
+            { field: 'idcard', label: 'Số CMND/CCCD', icon: 'bi-credit-card-2-front', isDefault: true, sampleData: '001234567890' },
+            { field: 'issue_date', label: 'Ngày cấp', icon: 'bi-calendar-check', isDefault: true, sampleData: '01/01/2020' },
+            { field: 'expiry_date', label: 'Ngày hết hạn', icon: 'bi-calendar-x', isDefault: true, sampleData: '01/01/2030' },
+            { field: 'address', label: 'Địa chỉ', icon: 'bi-geo-alt-fill', isDefault: true, sampleData: '123 Đường ABC, Quận 1, TP.HCM' },
+            { field: 'phone', label: 'Số điện thoại', icon: 'bi-telephone-fill', isDefault: true, sampleData: '0901234567' },
+            { field: 'email', label: 'Email', icon: 'bi-envelope-fill', isDefault: true, sampleData: 'email@example.com' }
         ];
 
         // ========== STATE ==========
@@ -561,6 +566,7 @@
                 div.innerHTML = `
                     <i class="${placeholder.icon || 'bi-tag'} me-2"></i>
                     <span>${placeholder.label}</span>
+                    <small class="d-block text-light opacity-75" style="font-size: 10px;">${placeholder.sampleData || ''}</small>
                     ${!placeholder.isDefault ? `<i class="bi bi-x-circle delete-placeholder" onclick="deleteCustomPlaceholder('${placeholder.field}')"></i>` : ''}
                 `;
                 
@@ -568,7 +574,8 @@
                 div.addEventListener('dragstart', (e) => {
                     draggedPlaceholder = {
                         field: placeholder.field,
-                        label: placeholder.label
+                        label: placeholder.label,
+                        sampleData: placeholder.sampleData || placeholder.label
                     };
                     div.classList.add('dragging');
                 });
@@ -584,6 +591,7 @@
         function addCustomPlaceholder() {
             const name = document.getElementById('newPlaceholderName').value.trim();
             const field = document.getElementById('newPlaceholderField').value.trim().toLowerCase().replace(/\s+/g, '_');
+            const sampleData = document.getElementById('newPlaceholderSample').value.trim();
             
             if (!name || !field) {
                 showToast('Lỗi', 'Vui lòng nhập đầy đủ thông tin', 'error');
@@ -601,7 +609,8 @@
                 field,
                 label: name,
                 icon: 'bi-tag-fill',
-                isDefault: false
+                isDefault: false,
+                sampleData: sampleData || name
             });
 
             saveCustomPlaceholders();
@@ -609,6 +618,7 @@
             
             document.getElementById('newPlaceholderName').value = '';
             document.getElementById('newPlaceholderField').value = '';
+            document.getElementById('newPlaceholderSample').value = '';
             
             showToast('Thành công', `Đã thêm placeholder: ${name}`, 'success');
         }
@@ -784,6 +794,7 @@
                     id: 'marker_' + Date.now(),
                     field: draggedPlaceholder.field,
                     label: draggedPlaceholder.label,
+                    sampleData: draggedPlaceholder.sampleData,
                     page: currentPage,
                     x,
                     y
@@ -809,8 +820,8 @@
                 div.style.left = marker.x + 'px';
                 div.style.top = marker.y + 'px';
                 div.innerHTML = `
-                    ${marker.label}
-                    <i class="bi bi-x-circle remove-marker" onclick="removeMarker('${marker.id}')"></i>
+                    ${marker.sampleData || marker.label}
+                    <i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="removeMarker('${marker.id}')"></i>
                 `;
                 
                 // Make draggable to reposition
