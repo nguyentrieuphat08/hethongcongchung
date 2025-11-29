@@ -160,63 +160,19 @@
                             <i class="bi bi-plus-circle me-2"></i>Thêm hợp đồng mới
                         </div>
                         <div class="card-body">
-                            <!-- Tab để chọn cách thêm -->
-                            <ul class="nav nav-tabs mb-3" id="addContractTab" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-pane" type="button">
-                                        <i class="bi bi-upload me-1"></i>Upload từ máy tính
-                                    </button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="url-tab" data-bs-toggle="tab" data-bs-target="#url-pane" type="button">
-                                        <i class="bi bi-link-45deg me-1"></i>Nhập URL
-                                    </button>
-                                </li>
-                            </ul>
-                            
-                            <div class="tab-content" id="addContractTabContent">
-                                <!-- Upload từ máy tính -->
-                                <div class="tab-pane fade show active" id="upload-pane" role="tabpanel">
-                                    <div class="row g-3">
-                                        <div class="col-md-5">
-                                            <label class="form-label">Tên hợp đồng</label>
-                                            <input type="text" class="form-control" id="uploadContractName" placeholder="VD: Hợp đồng mua bán nhà">
-                                        </div>
-                                        <div class="col-md-5">
-                                            <label class="form-label">Chọn file PDF</label>
-                                            <input type="file" class="form-control" id="uploadContractFile" accept=".pdf">
-                                        </div>
-                                        <div class="col-md-2 d-flex align-items-end">
-                                            <button class="btn btn-primary w-100" onclick="uploadContractFile()">
-                                                <i class="bi bi-upload me-1"></i>Upload
-                                            </button>
-                                        </div>
-                                    </div>
+                            <div class="row g-3">
+                                <div class="col-md-5">
+                                    <label class="form-label">Tên hợp đồng</label>
+                                    <input type="text" class="form-control" id="uploadContractName" placeholder="VD: Hợp đồng mua bán nhà">
                                 </div>
-                                
-                                <!-- Nhập URL -->
-                                <div class="tab-pane fade" id="url-pane" role="tabpanel">
-                                    <div class="row g-3">
-                                        <div class="col-md-4">
-                                            <label class="form-label">Tên hợp đồng</label>
-                                            <input type="text" class="form-control" id="newContractName" placeholder="VD: Hợp đồng mua bán nhà">
-                                        </div>
-                                        <div class="col-md-5">
-                                            <label class="form-label">URL file PDF (phải là link trực tiếp)</label>
-                                            <input type="text" class="form-control" id="newContractUrl" placeholder="https://example.com/file.pdf">
-                                        </div>
-                                        <div class="col-md-3 d-flex align-items-end">
-                                            <button class="btn btn-primary w-100" onclick="addContractManually()">
-                                                <i class="bi bi-plus-lg me-1"></i>Thêm
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="alert alert-warning mt-3 mb-0">
-                                        <small>
-                                            <i class="bi bi-exclamation-triangle me-1"></i>
-                                            <strong>Lưu ý:</strong> Google Drive không hỗ trợ tải trực tiếp. Vui lòng dùng tab "Upload từ máy tính" hoặc dùng các dịch vụ như Dropbox, OneDrive (link trực tiếp).
-                                        </small>
-                                    </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">Chọn file PDF</label>
+                                    <input type="file" class="form-control" id="uploadContractFile" accept=".pdf">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button class="btn btn-primary w-100" onclick="uploadContractFile()">
+                                        <i class="bi bi-upload me-1"></i>Upload
+                                    </button>
                                 </div>
                             </div>
                         </div>
