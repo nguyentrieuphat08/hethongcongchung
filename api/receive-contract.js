@@ -51,10 +51,28 @@ module.exports = async (req, res) => {
         // Generate ID if not provided
         const contractId = id || 'contract_' + Date.now();
 
+        // Lưu vào global contracts
+        if (!global.contracts) {
+            global.contracts = [];
+        }
+
+        // Check duplicate
+        const exists = global.contracts.some(c => c.url === url);
+        if (!exists) {
+            global.contracts.push({
+                id: contractId,
+                name,
+                url,
+                description: req.body.description || '',
+                markers: [],
+                createdAt: new Date().toISOString()
+            });
+        }
+
         // Return success response
         return res.status(200).json({
             success: true,
-            message: 'Contract received successfully',
+            message: exists ? 'Contract already exists' : 'Contract received and saved successfully',
             data: {
                 id: contractId,
                 name,
@@ -62,13 +80,8 @@ module.exports = async (req, res) => {
                 receivedAt: new Date().toISOString()
             },
             instructions: {
-                message: 'Contract data received. Please open the admin panel to see the contract.',
-                adminUrl: 'https://hethongcongchung.vercel.app/admin-contract.html',
-                nextSteps: [
-                    'The contract will be automatically downloaded and saved',
-                    'Open the admin panel to configure field positions',
-                    'The contract will appear in the dropdown menu'
-                ]
+                message: 'Contract data saved. Open the admin panel to see the contract.',
+                adminUrl: 'https://hethongcongchung.vercel.app/admin-contract.html'
             }
         });
 

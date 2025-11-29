@@ -287,6 +287,10 @@
         const CONTRACTS_KEY = 'contracts';
         const PLACEHOLDERS_KEY = 'custom_placeholders';
         const API_ENDPOINT = window.location.origin + '/api/receive-contract';
+        const CONTRACTS_API = window.location.origin + '/api/contracts';
+        
+        // CORS Proxy for Google Drive PDFs
+        const CORS_PROXY = 'https://corsproxy.io/?';
 
         // Default placeholders
         const DEFAULT_PLACEHOLDERS = [
@@ -311,12 +315,15 @@
         let draggedPlaceholder = null;
 
         // ========== INITIALIZATION ==========
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
             document.getElementById('apiEndpoint').textContent = API_ENDPOINT;
-            loadContracts();
+            await loadContracts();
             loadCustomPlaceholders();
             renderPlaceholders();
             setupReceiveContract();
+            
+            // Auto-refresh contracts every 10 seconds
+            setInterval(fetchContractsFromAPI, 10000);
         });
 
         // Setup to receive contract from n8n (via URL params or postMessage)
@@ -340,10 +347,37 @@
         }
 
         // ========== CONTRACTS MANAGEMENT ==========
-        function loadContracts() {
+        async function loadContracts() {
+            // Load from localStorage first
             const saved = localStorage.getItem(CONTRACTS_KEY);
             contracts = saved ? JSON.parse(saved) : [];
+            
+            // Then fetch from API to get contracts from n8n
+            await fetchContractsFromAPI();
+            
             renderContractSelect();
+        }
+
+        async function fetchContractsFromAPI() {
+            try {
+                const response = await fetch(CONTRACTS_API);
+                const data = await response.json();
+                
+                if (data.success && data.contracts && data.contracts.length > 0) {
+                    // Merge with existing contracts (avoid duplicates)
+                    data.contracts.forEach(apiContract => {
+                        const exists = contracts.some(c => c.url === apiContract.url);
+                        if (!exists) {
+                            contracts.push(apiContract);
+                        }
+                    });
+                    
+                    saveContracts();
+                    renderContractSelect();
+                }
+            } catch (error) {
+                console.log('Could not fetch contracts from API:', error);
+            }
         }
 
         function saveContracts() {
@@ -527,6 +561,43 @@
         }
 
         // ========== PDF LOADING & RENDERING ==========
+        function getPdfUrl(originalUrl) {
+            // Convert Google Drive view/share link to direct download link
+            let url = originalUrl;
+            
+            // Handle various Google Drive URL formats
+            if (url.includes('drive.google.com')) {
+                // Extract file ID from various formats
+                let fileId = null;
+                
+                if (url.includes('/file/d/')) {
+                    // Format: https://drive.google.com/file/d/FILE_ID/view
+                    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+                    if (match) fileId = match[1];
+                } else if (url.includes('id=')) {
+                    // Format: https://drive.google.com/uc?id=FILE_ID
+                    const match = url.match(/id=([a-zA-Z0-9_-]+)/);
+                    if (match) fileId = match[1];
+                } else if (url.includes('open?id=')) {
+                    // Format: https://drive.google.com/open?id=FILE_ID
+                    const match = url.match(/open\?id=([a-zA-Z0-9_-]+)/);
+                    if (match) fileId = match[1];
+                }
+                
+                if (fileId) {
+                    // Use Google Drive direct download URL
+                    url = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                }
+                
+                // Use CORS proxy for Google Drive
+                return CORS_PROXY + encodeURIComponent(url);
+            }
+            
+            // For other URLs, check if they need CORS proxy
+            // You can add more conditions here
+            return url;
+        }
+
         async function loadContract() {
             const select = document.getElementById('contractSelect');
             const index = parseInt(select.value);
@@ -552,8 +623,12 @@
                 // Initialize PDF.js
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
                 
+                // Get PDF URL with CORS proxy if needed
+                const pdfUrl = getPdfUrl(currentContract.url);
+                console.log('Loading PDF from:', pdfUrl);
+                
                 // Load PDF
-                currentPdf = await pdfjsLib.getDocument(currentContract.url).promise;
+                currentPdf = await pdfjsLib.getDocument(pdfUrl).promise;
                 totalPages = currentPdf.numPages;
                 currentPage = 1;
                 
