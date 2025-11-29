@@ -32,13 +32,26 @@
             cursor: grab;
             font-size: 13px;
             transition: transform 0.2s, box-shadow 0.2s;
+            user-select: none;
         }
         .placeholder-item:hover {
             transform: translateX(5px);
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
-        .placeholder-item.dragging {
-            opacity: 0.5;
+        .placeholder-item:active {
+            cursor: grabbing;
+        }
+        .drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 6px;
+            font-size: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            opacity: 0.9;
         }
         .placeholder-item .delete-placeholder {
             float: right;
@@ -74,15 +87,21 @@
             color: #000;
             padding: 2px 4px;
             border: none;
-            cursor: default;
+            cursor: grab;
             white-space: nowrap;
             z-index: 100;
+            user-select: none;
         }
         .field-marker:hover {
-            background-color: rgba(102, 126, 234, 0.1);
+            background-color: rgba(102, 126, 234, 0.15);
             border: 1px dashed #667eea;
-            cursor: move;
             border-radius: 2px;
+        }
+        .field-marker:active, .field-marker.dragging {
+            cursor: grabbing;
+            background-color: rgba(102, 126, 234, 0.25);
+            border: 2px solid #667eea;
+            z-index: 1000;
         }
         .field-marker .remove-marker {
             display: none;
@@ -355,11 +374,17 @@
         let currentPage = 1;
         let totalPages = 1;
         let markers = [];
-        let draggedPlaceholder = null;
         let fontSettings = {
             fontFamily: "'Times New Roman', Times, serif",
             fontSize: 13
         };
+        
+        // Drag state
+        let isDragging = false;
+        let dragType = null; // 'placeholder' or 'marker'
+        let dragData = null;
+        let dragGhost = null;
+        let dragOffset = { x: 0, y: 0 };
 
         // ========== INITIALIZATION ==========
         window.addEventListener('load', async () => {
@@ -619,7 +644,6 @@
             allPlaceholders.forEach((placeholder, index) => {
                 const div = document.createElement('div');
                 div.className = `placeholder-item ${placeholder.isDefault ? '' : 'custom-placeholder'}`;
-                div.draggable = true;
                 div.dataset.field = placeholder.field;
                 div.dataset.label = placeholder.label;
                 
@@ -627,25 +651,134 @@
                     <i class="${placeholder.icon || 'bi-tag'} me-2"></i>
                     <span>${placeholder.label}</span>
                     <small class="d-block text-light opacity-75" style="font-size: 10px;">${placeholder.sampleData || ''}</small>
-                    ${!placeholder.isDefault ? `<i class="bi bi-x-circle delete-placeholder" onclick="deleteCustomPlaceholder('${placeholder.field}')"></i>` : ''}
+                    ${!placeholder.isDefault ? `<i class="bi bi-x-circle delete-placeholder" onclick="event.stopPropagation(); deleteCustomPlaceholder('${placeholder.field}')"></i>` : ''}
                 `;
                 
-                // Drag events
-                div.addEventListener('dragstart', (e) => {
-                    draggedPlaceholder = {
-                        field: placeholder.field,
-                        label: placeholder.label,
-                        sampleData: placeholder.sampleData || placeholder.label
-                    };
-                    div.classList.add('dragging');
-                });
-                
-                div.addEventListener('dragend', () => {
-                    div.classList.remove('dragging');
+                // Mouse down - start drag
+                div.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('delete-placeholder')) return;
+                    e.preventDefault();
+                    startDragPlaceholder(e, placeholder);
                 });
                 
                 container.appendChild(div);
             });
+        }
+
+        // ========== IMPROVED DRAG SYSTEM ==========
+        function startDragPlaceholder(e, placeholder) {
+            isDragging = true;
+            dragType = 'placeholder';
+            dragData = {
+                field: placeholder.field,
+                label: placeholder.label,
+                sampleData: placeholder.sampleData || placeholder.label
+            };
+            
+            // Create ghost element
+            createDragGhost(placeholder.label, e.clientX, e.clientY);
+            
+            document.addEventListener('mousemove', onDragMove);
+            document.addEventListener('mouseup', onDragEnd);
+        }
+
+        function startDragMarker(e, marker, markerElement) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isDragging = true;
+            dragType = 'marker';
+            dragData = marker;
+            
+            const rect = markerElement.getBoundingClientRect();
+            dragOffset.x = e.clientX - rect.left;
+            dragOffset.y = e.clientY - rect.top;
+            
+            markerElement.classList.add('dragging');
+            
+            document.addEventListener('mousemove', onDragMove);
+            document.addEventListener('mouseup', onDragEnd);
+        }
+
+        function createDragGhost(text, x, y) {
+            dragGhost = document.createElement('div');
+            dragGhost.className = 'drag-ghost';
+            dragGhost.textContent = text;
+            dragGhost.style.left = (x + 10) + 'px';
+            dragGhost.style.top = (y + 10) + 'px';
+            document.body.appendChild(dragGhost);
+        }
+
+        function onDragMove(e) {
+            if (!isDragging) return;
+            
+            if (dragType === 'placeholder' && dragGhost) {
+                dragGhost.style.left = (e.clientX + 10) + 'px';
+                dragGhost.style.top = (e.clientY + 10) + 'px';
+            } else if (dragType === 'marker') {
+                const container = document.getElementById('markersContainer');
+                if (!container) return;
+                
+                const rect = container.getBoundingClientRect();
+                const x = e.clientX - rect.left - dragOffset.x;
+                const y = e.clientY - rect.top - dragOffset.y;
+                
+                // Update marker position in real-time
+                dragData.x = Math.max(0, Math.min(x, rect.width - 50));
+                dragData.y = Math.max(0, Math.min(y, rect.height - 20));
+                
+                const markerEl = document.querySelector(`[data-marker-id="${dragData.id}"]`);
+                if (markerEl) {
+                    markerEl.style.left = dragData.x + 'px';
+                    markerEl.style.top = dragData.y + 'px';
+                }
+            }
+        }
+
+        function onDragEnd(e) {
+            if (!isDragging) return;
+            
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            
+            if (dragType === 'placeholder') {
+                // Remove ghost
+                if (dragGhost) {
+                    dragGhost.remove();
+                    dragGhost = null;
+                }
+                
+                // Check if dropped on PDF
+                const pdfPage = document.getElementById('pdfPage');
+                if (pdfPage) {
+                    const rect = pdfPage.getBoundingClientRect();
+                    if (e.clientX >= rect.left && e.clientX <= rect.right &&
+                        e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                        
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+                        
+                        markers.push({
+                            id: 'marker_' + Date.now(),
+                            field: dragData.field,
+                            label: dragData.label,
+                            sampleData: dragData.sampleData,
+                            page: currentPage,
+                            x,
+                            y
+                        });
+                        
+                        renderMarkers();
+                    }
+                }
+            } else if (dragType === 'marker') {
+                // Marker already updated in real-time
+                document.querySelectorAll('.field-marker').forEach(el => el.classList.remove('dragging'));
+            }
+            
+            isDragging = false;
+            dragType = null;
+            dragData = null;
         }
 
         function addCustomPlaceholder() {
@@ -820,49 +953,10 @@
             
             container.appendChild(pageWrapper);
             
-            // Setup drag & drop
-            setupDragDrop(pageWrapper);
-            
             // Render existing markers for this page
             renderMarkers();
             
             document.getElementById('currentPageNum').textContent = pageNum;
-        }
-
-        function setupDragDrop(pageWrapper) {
-            pageWrapper.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                pageWrapper.style.outline = '3px solid #667eea';
-            });
-            
-            pageWrapper.addEventListener('dragleave', () => {
-                pageWrapper.style.outline = 'none';
-            });
-            
-            pageWrapper.addEventListener('drop', (e) => {
-                e.preventDefault();
-                pageWrapper.style.outline = 'none';
-                
-                if (!draggedPlaceholder) return;
-                
-                const rect = pageWrapper.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                // Add marker
-                markers.push({
-                    id: 'marker_' + Date.now(),
-                    field: draggedPlaceholder.field,
-                    label: draggedPlaceholder.label,
-                    sampleData: draggedPlaceholder.sampleData,
-                    page: currentPage,
-                    x,
-                    y
-                });
-                
-                renderMarkers();
-                draggedPlaceholder = null;
-            });
         }
 
         function renderMarkers() {
@@ -877,36 +971,22 @@
             pageMarkers.forEach(marker => {
                 const div = document.createElement('div');
                 div.className = 'field-marker';
+                div.dataset.markerId = marker.id;
                 div.style.left = marker.x + 'px';
                 div.style.top = marker.y + 'px';
                 div.style.fontFamily = fontSettings.fontFamily;
                 div.style.fontSize = fontSettings.fontSize + 'px';
                 div.innerHTML = `
-                    <span class="marker-text">${marker.sampleData || marker.label}</span><i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="removeMarker('${marker.id}')"></i>
+                    <span class="marker-text">${marker.sampleData || marker.label}</span><i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="event.stopPropagation(); removeMarker('${marker.id}')"></i>
                 `;
                 
-                // Make draggable to reposition
-                div.draggable = true;
-                div.addEventListener('dragstart', (e) => {
-                    e.dataTransfer.setData('markerId', marker.id);
+                // Mouse events for dragging
+                div.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('remove-marker')) return;
+                    startDragMarker(e, marker, div);
                 });
                 
                 container.appendChild(div);
-            });
-            
-            // Handle marker repositioning
-            container.addEventListener('dragover', (e) => e.preventDefault());
-            container.addEventListener('drop', (e) => {
-                const markerId = e.dataTransfer.getData('markerId');
-                if (markerId) {
-                    const marker = markers.find(m => m.id === markerId);
-                    if (marker) {
-                        const rect = container.getBoundingClientRect();
-                        marker.x = e.clientX - rect.left;
-                        marker.y = e.clientY - rect.top;
-                        renderMarkers();
-                    }
-                }
             });
         }
 
