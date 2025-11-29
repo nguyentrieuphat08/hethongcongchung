@@ -145,25 +145,18 @@
         .word-document {
             position: relative;
             background: white;
-            padding: 60px 80px;
             margin: 20px auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             min-height: 800px;
-            max-width: 800px;
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 13px;
-            line-height: 1.6;
+            overflow: hidden;
         }
-        .word-document table {
-            border-collapse: collapse;
-            width: 100%;
+        .word-document .docx-wrapper {
+            background: white !important;
+            padding: 0 !important;
         }
-        .word-document td, .word-document th {
-            border: 1px solid #000;
-            padding: 5px 10px;
-        }
-        .word-document p {
-            margin-bottom: 10px;
+        .word-document section.docx {
+            box-shadow: none !important;
+            margin-bottom: 0 !important;
         }
     </style>
 </head>
@@ -363,7 +356,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://unpkg.com/docx-preview@0.1.20/dist/docx-preview.min.js"></script>
     <script>
         // ========== CONFIGURATION ==========
         const CONTRACTS_KEY = 'contracts';
@@ -964,7 +957,7 @@
                     </div>
                 `;
                 
-                // Convert base64 to ArrayBuffer
+                // Convert base64 to Blob
                 const base64Data = currentContract.url.split(',')[1];
                 const binaryString = window.atob(base64Data);
                 const len = binaryString.length;
@@ -972,20 +965,7 @@
                 for (let i = 0; i < len; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
-                
-                // Convert Word to HTML using Mammoth
-                const options = {
-                    styleMap: [
-                        "p[style-name='Heading 1'] => h1:fresh",
-                        "p[style-name='Heading 2'] => h2:fresh",
-                        "b => strong",
-                        "i => em",
-                        "u => u"
-                    ]
-                };
-                
-                const result = await mammoth.convertToHtml({ arrayBuffer: bytes.buffer }, options);
-                const html = result.value;
+                const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
                 
                 // Create container
                 const container = document.getElementById('pdfContainer');
@@ -997,19 +977,40 @@
                 docWrapper.id = 'pdfPage';
                 docWrapper.style.position = 'relative';
                 
-                // Add content
+                // Create content container for docx-preview
                 const contentDiv = document.createElement('div');
+                contentDiv.id = 'wordContent';
                 contentDiv.className = 'word-content';
-                contentDiv.innerHTML = html || '<p>Không có nội dung</p>';
                 docWrapper.appendChild(contentDiv);
                 
                 // Create markers container
                 const markersContainer = document.createElement('div');
                 markersContainer.id = 'markersContainer';
-                markersContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
+                markersContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;';
                 docWrapper.appendChild(markersContainer);
                 
                 container.appendChild(docWrapper);
+                
+                // Render Word document using docx-preview
+                await docx.renderAsync(blob, contentDiv, null, {
+                    className: 'docx',
+                    inWrapper: true,
+                    ignoreWidth: false,
+                    ignoreHeight: false,
+                    ignoreFonts: false,
+                    breakPages: true,
+                    ignoreLastRenderedPageBreak: false,
+                    experimental: true,
+                    trimXmlDeclaration: true,
+                    useBase64URL: true,
+                    renderHeaders: true,
+                    renderFooters: true,
+                    renderFootnotes: true,
+                    renderEndnotes: true
+                });
+                
+                // Enable pointer events for markers after render
+                markersContainer.style.pointerEvents = 'auto';
                 
                 // Render markers
                 currentPage = 1;
@@ -1023,11 +1024,6 @@
                 document.getElementById('pageInfo').style.display = 'block';
                 document.getElementById('totalPages').textContent = '1';
                 document.getElementById('currentPageNum').textContent = '1';
-                
-                // Show warnings if any
-                if (result.messages && result.messages.length > 0) {
-                    console.log('Mammoth warnings:', result.messages);
-                }
                 
             } catch (error) {
                 console.error('Error loading Word document:', error);
