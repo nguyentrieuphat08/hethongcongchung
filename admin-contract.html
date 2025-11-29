@@ -993,7 +993,11 @@
                 container.appendChild(docWrapper);
                 
                 // Render Word document using docx-preview
-                await docxPreview.renderAsync(blob, contentDiv, null, {
+                const docxLib = window.docx || window.docxPreview || window['docx-preview'];
+                if (!docxLib) {
+                    throw new Error('Thư viện docx-preview chưa được tải');
+                }
+                await docxLib.renderAsync(blob, contentDiv, null, {
                     className: 'docx',
                     inWrapper: true,
                     ignoreWidth: false,
