@@ -142,6 +142,29 @@
             gap: 10px;
             margin-top: 10px;
         }
+        .word-document {
+            position: relative;
+            background: white;
+            padding: 60px 80px;
+            margin: 20px auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            min-height: 800px;
+            max-width: 800px;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .word-document table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .word-document td, .word-document th {
+            border: 1px solid #000;
+            padding: 5px 10px;
+        }
+        .word-document p {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -195,8 +218,8 @@
                                     <input type="text" class="form-control" id="uploadContractName" placeholder="VD: Hợp đồng mua bán nhà">
                                 </div>
                                 <div class="col-md-5">
-                                    <label class="form-label">Chọn file PDF</label>
-                                    <input type="file" class="form-control" id="uploadContractFile" accept=".pdf">
+                                    <label class="form-label">Chọn file PDF hoặc Word</label>
+                                    <input type="file" class="form-control" id="uploadContractFile" accept=".pdf,.docx,.doc">
                                 </div>
                                 <div class="col-md-2 d-flex align-items-end">
                                     <button class="btn btn-primary w-100" onclick="uploadContractFile()">
@@ -340,6 +363,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script>
         // ========== CONFIGURATION ==========
         const CONTRACTS_KEY = 'contracts';
@@ -563,7 +587,7 @@
             }
         }
 
-        // Upload PDF file from computer
+        // Upload PDF or Word file from computer
         function uploadContractFile() {
             const name = document.getElementById('uploadContractName').value.trim();
             const fileInput = document.getElementById('uploadContractFile');
@@ -575,30 +599,35 @@
             }
 
             if (!file) {
-                showToast('Lỗi', 'Vui lòng chọn file PDF', 'error');
+                showToast('Lỗi', 'Vui lòng chọn file', 'error');
                 return;
             }
 
-            if (file.type !== 'application/pdf') {
-                showToast('Lỗi', 'Vui lòng chọn file PDF', 'error');
+            const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+            const isWord = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                          file.name.endsWith('.docx') || file.name.endsWith('.doc');
+
+            if (!isPdf && !isWord) {
+                showToast('Lỗi', 'Vui lòng chọn file PDF hoặc Word (.docx)', 'error');
                 return;
             }
 
-            // Read file as base64 Data URL
+            // Check if duplicate
+            if (contracts.some(c => c.name === name)) {
+                showToast('Lỗi', 'Tên hợp đồng đã tồn tại', 'error');
+                return;
+            }
+
+            // Read file
             const reader = new FileReader();
             reader.onload = function(e) {
                 const dataUrl = e.target.result;
                 
-                // Check if duplicate
-                if (contracts.some(c => c.name === name)) {
-                    showToast('Lỗi', 'Tên hợp đồng đã tồn tại', 'error');
-                    return;
-                }
-
                 contracts.push({
                     id: 'contract_' + Date.now(),
                     name,
-                    url: dataUrl, // Store as base64 data URL
+                    url: dataUrl,
+                    fileType: isPdf ? 'pdf' : 'word',
                     isLocal: true,
                     description: '',
                     markers: [],
@@ -856,6 +885,17 @@
             currentContract = contracts[index];
             markers = currentContract.markers || [];
             
+            // Determine file type
+            const fileType = currentContract.fileType || 'pdf';
+            
+            if (fileType === 'word') {
+                await loadWordDocument();
+            } else {
+                await loadPdfDocument();
+            }
+        }
+
+        async function loadPdfDocument() {
             try {
                 document.getElementById('pdfContainer').innerHTML = `
                     <div class="text-center p-5">
@@ -910,6 +950,89 @@
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         Lỗi khi tải PDF: ${error.message}
                         <br><small>URL: ${currentContract.url}</small>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadWordDocument() {
+            try {
+                document.getElementById('pdfContainer').innerHTML = `
+                    <div class="text-center p-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-3">Đang tải file Word...</p>
+                    </div>
+                `;
+                
+                // Convert base64 to ArrayBuffer
+                const base64 = currentContract.url.split(',')[1];
+                const binaryString = atob(base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const arrayBuffer = bytes.buffer;
+                
+                // Convert Word to HTML using Mammoth
+                const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+                const html = result.value;
+                
+                // Create container
+                const container = document.getElementById('pdfContainer');
+                container.innerHTML = '';
+                
+                // Create document wrapper
+                const docWrapper = document.createElement('div');
+                docWrapper.className = 'word-document';
+                docWrapper.id = 'pdfPage';
+                docWrapper.style.position = 'relative';
+                
+                // Add content
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'word-content';
+                contentDiv.innerHTML = html;
+                docWrapper.appendChild(contentDiv);
+                
+                // Create markers container
+                const markersContainer = document.createElement('div');
+                markersContainer.id = 'markersContainer';
+                markersContainer.style.position = 'absolute';
+                markersContainer.style.top = '0';
+                markersContainer.style.left = '0';
+                markersContainer.style.width = '100%';
+                markersContainer.style.height = '100%';
+                markersContainer.style.pointerEvents = 'none';
+                docWrapper.appendChild(markersContainer);
+                
+                container.appendChild(docWrapper);
+                
+                // Enable pointer events for markers
+                markersContainer.style.pointerEvents = 'auto';
+                
+                // Render markers
+                currentPage = 1;
+                totalPages = 1;
+                currentPdf = null;
+                renderMarkers();
+                
+                document.getElementById('saveBtn').disabled = false;
+                document.getElementById('clearMarkersBtn').disabled = false;
+                document.getElementById('pageNavigation').style.display = 'none';
+                document.getElementById('pageInfo').style.display = 'block';
+                document.getElementById('totalPages').textContent = '1';
+                document.getElementById('currentPageNum').textContent = '1';
+                
+                // Show warnings if any
+                if (result.messages.length > 0) {
+                    console.log('Mammoth warnings:', result.messages);
+                }
+                
+            } catch (error) {
+                console.error('Error loading Word document:', error);
+                document.getElementById('pdfContainer').innerHTML = `
+                    <div class="alert alert-danger m-4">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Lỗi khi tải file Word: ${error.message}
                     </div>
                 `;
             }
