@@ -281,8 +281,9 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="form-label small mb-1">Cỡ chữ (px)</label>
+                                        <label class="form-label small mb-1">Cỡ chữ gốc (px)</label>
                                         <input type="number" class="form-control form-control-sm" id="fontSize" value="13" min="8" max="36" onchange="updateFontSettings()">
+                                        <small class="text-muted">Sẽ tự động scale theo PDF</small>
                                     </div>
                                 </div>
                             </div>
@@ -396,6 +397,7 @@
             fontFamily: "'Times New Roman', Times, serif",
             fontSize: 13
         };
+        let pdfScale = 1.5; // PDF render scale
         
         // Drag state
         let isDragging = false;
@@ -1097,7 +1099,8 @@
                 div.style.left = marker.x + 'px';
                 div.style.top = marker.y + 'px';
                 div.style.fontFamily = fontSettings.fontFamily;
-                div.style.fontSize = fontSettings.fontSize + 'px';
+                // Apply scale to font size so it matches PDF text
+                div.style.fontSize = (fontSettings.fontSize * pdfScale) + 'px';
                 div.innerHTML = `
                     <span class="marker-text">${marker.sampleData || marker.label}</span><i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="event.stopPropagation(); removeMarker('${marker.id}')"></i>
                 `;
