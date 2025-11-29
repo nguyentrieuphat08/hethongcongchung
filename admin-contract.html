@@ -928,6 +928,7 @@
                 currentPdf = await pdfjsLib.getDocument(pdfUrl).promise;
                 totalPages = currentPdf.numPages;
                 currentPage = 1;
+                pdfScale = 1.5; // PDF scale
                 
                 await renderPage(currentPage);
                 
@@ -1013,10 +1014,11 @@
                 // Enable pointer events for markers after render
                 markersContainer.style.pointerEvents = 'auto';
                 
-                // Render markers
+                // Render markers - Word không scale nên dùng scale = 1
                 currentPage = 1;
                 totalPages = 1;
                 currentPdf = null;
+                pdfScale = 1; // Word không scale như PDF
                 renderMarkers();
                 
                 document.getElementById('saveBtn').disabled = false;
