@@ -965,16 +965,26 @@
                 `;
                 
                 // Convert base64 to ArrayBuffer
-                const base64 = currentContract.url.split(',')[1];
-                const binaryString = atob(base64);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
+                const base64Data = currentContract.url.split(',')[1];
+                const binaryString = window.atob(base64Data);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
-                const arrayBuffer = bytes.buffer;
                 
                 // Convert Word to HTML using Mammoth
-                const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+                const options = {
+                    styleMap: [
+                        "p[style-name='Heading 1'] => h1:fresh",
+                        "p[style-name='Heading 2'] => h2:fresh",
+                        "b => strong",
+                        "i => em",
+                        "u => u"
+                    ]
+                };
+                
+                const result = await mammoth.convertToHtml({ arrayBuffer: bytes.buffer }, options);
                 const html = result.value;
                 
                 // Create container
@@ -990,24 +1000,16 @@
                 // Add content
                 const contentDiv = document.createElement('div');
                 contentDiv.className = 'word-content';
-                contentDiv.innerHTML = html;
+                contentDiv.innerHTML = html || '<p>Không có nội dung</p>';
                 docWrapper.appendChild(contentDiv);
                 
                 // Create markers container
                 const markersContainer = document.createElement('div');
                 markersContainer.id = 'markersContainer';
-                markersContainer.style.position = 'absolute';
-                markersContainer.style.top = '0';
-                markersContainer.style.left = '0';
-                markersContainer.style.width = '100%';
-                markersContainer.style.height = '100%';
-                markersContainer.style.pointerEvents = 'none';
+                markersContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
                 docWrapper.appendChild(markersContainer);
                 
                 container.appendChild(docWrapper);
-                
-                // Enable pointer events for markers
-                markersContainer.style.pointerEvents = 'auto';
                 
                 // Render markers
                 currentPage = 1;
@@ -1023,7 +1025,7 @@
                 document.getElementById('currentPageNum').textContent = '1';
                 
                 // Show warnings if any
-                if (result.messages.length > 0) {
+                if (result.messages && result.messages.length > 0) {
                     console.log('Mammoth warnings:', result.messages);
                 }
                 
@@ -1033,6 +1035,8 @@
                     <div class="alert alert-danger m-4">
                         <i class="bi bi-exclamation-triangle me-2"></i>
                         Lỗi khi tải file Word: ${error.message}
+                        <br><br>
+                        <small>Lưu ý: Chỉ hỗ trợ file .docx (Word 2007 trở lên). File .doc cũ không được hỗ trợ.</small>
                     </div>
                 `;
             }
