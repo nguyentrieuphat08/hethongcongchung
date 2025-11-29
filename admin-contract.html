@@ -74,8 +74,6 @@
             color: #000;
             padding: 2px 4px;
             border: none;
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 13px;
             cursor: default;
             white-space: nowrap;
             z-index: 100;
@@ -228,6 +226,32 @@
                                 </button>
                             </div>
 
+                            <!-- Cài đặt font chữ -->
+                            <div class="card mb-3">
+                                <div class="card-header py-2">
+                                    <small class="fw-bold"><i class="bi bi-fonts me-1"></i>Cài đặt font chữ</small>
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Font chữ</label>
+                                        <select class="form-select form-select-sm" id="fontFamily" onchange="updateFontSettings()">
+                                            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                                            <option value="Arial, sans-serif">Arial</option>
+                                            <option value="'Courier New', monospace">Courier New</option>
+                                            <option value="Georgia, serif">Georgia</option>
+                                            <option value="Verdana, sans-serif">Verdana</option>
+                                            <option value="Tahoma, sans-serif">Tahoma</option>
+                                            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                                            <option value="'Palatino Linotype', serif">Palatino</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label small mb-1">Cỡ chữ (px)</label>
+                                        <input type="number" class="form-control form-control-sm" id="fontSize" value="13" min="8" max="36" onchange="updateFontSettings()">
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Danh sách placeholder -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold">
@@ -332,10 +356,15 @@
         let totalPages = 1;
         let markers = [];
         let draggedPlaceholder = null;
+        let fontSettings = {
+            fontFamily: "'Times New Roman', Times, serif",
+            fontSize: 13
+        };
 
         // ========== INITIALIZATION ==========
         window.addEventListener('load', async () => {
             document.getElementById('apiEndpoint').textContent = API_ENDPOINT;
+            loadFontSettings();
             await loadContracts();
             loadCustomPlaceholders();
             renderPlaceholders();
@@ -344,6 +373,27 @@
             // Auto-refresh contracts every 10 seconds
             setInterval(fetchContractsFromAPI, 10000);
         });
+
+        // ========== FONT SETTINGS ==========
+        function loadFontSettings() {
+            const saved = localStorage.getItem('fontSettings');
+            if (saved) {
+                fontSettings = JSON.parse(saved);
+                document.getElementById('fontFamily').value = fontSettings.fontFamily;
+                document.getElementById('fontSize').value = fontSettings.fontSize;
+            }
+        }
+
+        function saveFontSettings() {
+            localStorage.setItem('fontSettings', JSON.stringify(fontSettings));
+        }
+
+        function updateFontSettings() {
+            fontSettings.fontFamily = document.getElementById('fontFamily').value;
+            fontSettings.fontSize = parseInt(document.getElementById('fontSize').value) || 13;
+            saveFontSettings();
+            renderMarkers();
+        }
 
         // Setup to receive contract from n8n (via URL params or postMessage)
         function setupReceiveContract() {
@@ -829,6 +879,8 @@
                 div.className = 'field-marker';
                 div.style.left = marker.x + 'px';
                 div.style.top = marker.y + 'px';
+                div.style.fontFamily = fontSettings.fontFamily;
+                div.style.fontSize = fontSettings.fontSize + 'px';
                 div.innerHTML = `
                     <span class="marker-text">${marker.sampleData || marker.label}</span><i class="bi bi-x-circle remove-marker" style="margin-left: 5px; color: #dc3545; font-size: 11px;" onclick="removeMarker('${marker.id}')"></i>
                 `;
