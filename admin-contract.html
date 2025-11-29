@@ -6,7 +6,114 @@
     <title>Quản lý Mẫu Hợp đồng</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .sidebar {
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .nav-link.active {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 8px;
+        }
+        .nav-link:hover {
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .placeholder-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: grab;
+            font-size: 13px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .placeholder-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .placeholder-item.dragging {
+            opacity: 0.5;
+        }
+        .placeholder-item .delete-placeholder {
+            float: right;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .placeholder-item .delete-placeholder:hover {
+            opacity: 1;
+        }
+        .custom-placeholder {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        .pdf-container {
+            position: relative;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            min-height: 600px;
+            background-color: #f8f9fa;
+            overflow: auto;
+        }
+        .pdf-container.drag-over {
+            border-color: #667eea;
+            background-color: #f0f4ff;
+        }
+        .pdf-page {
+            position: relative;
+            margin: 20px auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        .field-marker {
+            position: absolute;
+            background-color: rgba(102, 126, 234, 0.9);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: move;
+            white-space: nowrap;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .field-marker .remove-marker {
+            margin-left: 8px;
+            cursor: pointer;
+            opacity: 0.8;
+        }
+        .field-marker .remove-marker:hover {
+            opacity: 1;
+        }
+        .add-placeholder-form {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+        .contract-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .contract-item:hover {
+            background-color: #e9ecef;
+        }
+        .page-navigation {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <div class="container-fluid">
@@ -42,8 +149,33 @@
                     <!-- API Endpoint Info -->
                     <div class="alert alert-info mb-4">
                         <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>API Endpoint để n8n gửi hợp đồng</h6>
-                        <p class="mb-0"><strong>POST:</strong> <code id="apiEndpoint">window.location.origin + '/api/receive-contract'</code></p>
-                        <p class="mb-0 mt-2"><strong>Body:</strong> <code>{ "name": "Tên hợp đồng", "url": "https://drive.google.com/..." }</code></p>
+                        <p class="mb-1"><strong>URL:</strong> <code id="apiEndpoint"></code></p>
+                        <p class="mb-1"><strong>Method:</strong> <code>POST</code></p>
+                        <p class="mb-0"><strong>Body:</strong> <code>{ "name": "Tên hợp đồng", "url": "https://link-to-pdf...", "description": "Mô tả" }</code></p>
+                    </div>
+
+                    <!-- Thêm hợp đồng thủ công -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <i class="bi bi-plus-circle me-2"></i>Thêm hợp đồng mới
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Tên hợp đồng</label>
+                                    <input type="text" class="form-control" id="newContractName" placeholder="VD: Hợp đồng mua bán nhà">
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">URL file PDF</label>
+                                    <input type="text" class="form-control" id="newContractUrl" placeholder="https://drive.google.com/...">
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button class="btn btn-primary w-100" onclick="addContractManually()">
+                                        <i class="bi bi-plus-lg me-2"></i>Thêm hợp đồng
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <hr class="my-4">
@@ -52,6 +184,7 @@
                     <div class="row">
                         <!-- Left Panel: Contract Selection & Placeholders -->
                         <div class="col-md-3">
+                            <!-- Chọn hợp đồng -->
                             <div class="mb-4">
                                 <label class="form-label fw-bold">
                                     <i class="bi bi-file-text me-2"></i>Chọn hợp đồng
@@ -59,8 +192,28 @@
                                 <select class="form-select" id="contractSelect" onchange="loadContract()">
                                     <option value="">-- Chọn hợp đồng --</option>
                                 </select>
+                                <button class="btn btn-outline-danger btn-sm w-100 mt-2" onclick="deleteSelectedContract()" id="deleteContractBtn" style="display: none;">
+                                    <i class="bi bi-trash me-1"></i>Xóa hợp đồng này
+                                </button>
                             </div>
 
+                            <!-- Thêm placeholder tùy chỉnh -->
+                            <div class="add-placeholder-form">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-plus-circle me-2"></i>Thêm Placeholder mới
+                                </label>
+                                <div class="input-group input-group-sm mb-2">
+                                    <input type="text" class="form-control" id="newPlaceholderName" placeholder="Tên hiển thị">
+                                </div>
+                                <div class="input-group input-group-sm mb-2">
+                                    <input type="text" class="form-control" id="newPlaceholderField" placeholder="Tên biến (VD: so_hop_dong)">
+                                </div>
+                                <button class="btn btn-success btn-sm w-100" onclick="addCustomPlaceholder()">
+                                    <i class="bi bi-plus-lg me-1"></i>Thêm Placeholder
+                                </button>
+                            </div>
+
+                            <!-- Danh sách placeholder -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold">
                                     <i class="bi bi-tags me-2"></i>Các biến Placeholder
@@ -68,56 +221,45 @@
                                 <small class="d-block text-muted mb-2">Kéo thả vào hợp đồng bên phải</small>
                             </div>
 
-                            <div id="placeholdersList">
-                                <div class="placeholder-item" draggable="true" data-field="fullname">
-                                    <i class="bi bi-person-fill me-2"></i>Họ và tên
-                                </div>
-                                <div class="placeholder-item" draggable="true" data-field="birthday">
-                                    <i class="bi bi-calendar-event me-2"></i>Ngày sinh
-                                </div>
-                                <div class="placeholder-item" draggable="true" data-field="idcard">
-                                    <i class="bi bi-credit-card-2-front me-2"></i>Số CMND/CCCD
-                                </div>
-                                <div class="placeholder-item" draggable="true" data-field="issue_date">
-                                    <i class="bi bi-calendar-check me-2"></i>Ngày cấp
-                                </div>
-                                <div class="placeholder-item" draggable="true" data-field="expiry_date">
-                                    <i class="bi bi-calendar-x me-2"></i>Ngày hết hạn
-                                </div>
-                                <div class="placeholder-item" draggable="true" data-field="address">
-                                    <i class="bi bi-geo-alt-fill me-2"></i>Địa chỉ
-                                </div>
-                                <div class="placeholder-item" draggable="true" data-field="phone">
-                                    <i class="bi bi-telephone-fill me-2"></i>Số điện thoại
-                                </div>
-                                <div class="placeholder-item" draggable="true" data-field="email">
-                                    <i class="bi bi-envelope-fill me-2"></i>Email
-                                </div>
-                            </div>
+                            <div id="placeholdersList"></div>
 
                             <div class="mt-4">
                                 <button class="btn btn-success w-100" onclick="saveContractConfig()" id="saveBtn" disabled>
                                     <i class="bi bi-save me-2"></i>Lưu cấu hình
                                 </button>
-                                <button class="btn btn-danger w-100 mt-2" onclick="clearAllMarkers()">
-                                    <i class="bi bi-trash me-2"></i>Xóa tất cả marker
+                                <button class="btn btn-warning w-100 mt-2" onclick="clearAllMarkers()" id="clearMarkersBtn" disabled>
+                                    <i class="bi bi-eraser me-2"></i>Xóa tất cả marker
                                 </button>
                             </div>
                         </div>
 
                         <!-- Right Panel: Contract Canvas -->
                         <div class="col-md-9">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label fw-bold mb-0">
                                     <i class="bi bi-file-pdf me-2"></i>Hợp đồng mẫu
                                 </label>
+                                <div id="pageInfo" style="display: none;">
+                                    <span class="badge bg-secondary">Trang <span id="currentPageNum">1</span> / <span id="totalPages">1</span></span>
+                                </div>
                             </div>
 
-                            <div id="contractCanvasWrapper">
-                                <div class="alert alert-secondary text-center">
+                            <div class="pdf-container" id="pdfContainer">
+                                <div class="alert alert-secondary text-center m-4">
                                     <i class="bi bi-arrow-left-circle me-2"></i>
                                     Chọn một hợp đồng từ menu bên trái để bắt đầu chỉnh sửa
                                 </div>
+                            </div>
+
+                            <!-- Page Navigation -->
+                            <div class="page-navigation" id="pageNavigation" style="display: none;">
+                                <button class="btn btn-outline-primary btn-sm" onclick="prevPage()" id="prevPageBtn">
+                                    <i class="bi bi-chevron-left"></i> Trang trước
+                                </button>
+                                <span id="pageIndicator">1 / 1</span>
+                                <button class="btn btn-outline-primary btn-sm" onclick="nextPage()" id="nextPageBtn">
+                                    Trang sau <i class="bi bi-chevron-right"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -126,8 +268,517 @@
         </div>
     </div>
 
+    <!-- Toast notification -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="bi bi-check-circle-fill text-success me-2" id="toastIcon"></i>
+                <strong class="me-auto" id="toastTitle">Thông báo</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastBody"></div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="js/admin-contract.js"></script>
+    <script>
+        // ========== CONFIGURATION ==========
+        const CONTRACTS_KEY = 'contracts';
+        const PLACEHOLDERS_KEY = 'custom_placeholders';
+        const API_ENDPOINT = window.location.origin + '/api/receive-contract';
+
+        // Default placeholders
+        const DEFAULT_PLACEHOLDERS = [
+            { field: 'fullname', label: 'Họ và tên', icon: 'bi-person-fill', isDefault: true },
+            { field: 'birthday', label: 'Ngày sinh', icon: 'bi-calendar-event', isDefault: true },
+            { field: 'idcard', label: 'Số CMND/CCCD', icon: 'bi-credit-card-2-front', isDefault: true },
+            { field: 'issue_date', label: 'Ngày cấp', icon: 'bi-calendar-check', isDefault: true },
+            { field: 'expiry_date', label: 'Ngày hết hạn', icon: 'bi-calendar-x', isDefault: true },
+            { field: 'address', label: 'Địa chỉ', icon: 'bi-geo-alt-fill', isDefault: true },
+            { field: 'phone', label: 'Số điện thoại', icon: 'bi-telephone-fill', isDefault: true },
+            { field: 'email', label: 'Email', icon: 'bi-envelope-fill', isDefault: true }
+        ];
+
+        // ========== STATE ==========
+        let contracts = [];
+        let customPlaceholders = [];
+        let currentContract = null;
+        let currentPdf = null;
+        let currentPage = 1;
+        let totalPages = 1;
+        let markers = [];
+        let draggedPlaceholder = null;
+
+        // ========== INITIALIZATION ==========
+        window.addEventListener('load', () => {
+            document.getElementById('apiEndpoint').textContent = API_ENDPOINT;
+            loadContracts();
+            loadCustomPlaceholders();
+            renderPlaceholders();
+            setupReceiveContract();
+        });
+
+        // Setup to receive contract from n8n (via URL params or postMessage)
+        function setupReceiveContract() {
+            // Check URL params
+            const urlParams = new URLSearchParams(window.location.search);
+            const name = urlParams.get('name');
+            const url = urlParams.get('url');
+            
+            if (name && url) {
+                addContract({ name: decodeURIComponent(name), url: decodeURIComponent(url) });
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            // Listen for postMessage
+            window.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'add-contract') {
+                    addContract(event.data.contract);
+                }
+            });
+        }
+
+        // ========== CONTRACTS MANAGEMENT ==========
+        function loadContracts() {
+            const saved = localStorage.getItem(CONTRACTS_KEY);
+            contracts = saved ? JSON.parse(saved) : [];
+            renderContractSelect();
+        }
+
+        function saveContracts() {
+            localStorage.setItem(CONTRACTS_KEY, JSON.stringify(contracts));
+        }
+
+        function renderContractSelect() {
+            const select = document.getElementById('contractSelect');
+            select.innerHTML = '<option value="">-- Chọn hợp đồng --</option>';
+            
+            contracts.forEach((contract, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = contract.name;
+                select.appendChild(option);
+            });
+        }
+
+        function addContract(contractData) {
+            const { name, url, description } = contractData;
+            
+            if (!name || !url) {
+                showToast('Lỗi', 'Thiếu tên hoặc URL hợp đồng', 'error');
+                return;
+            }
+
+            // Check duplicate
+            if (contracts.some(c => c.url === url)) {
+                showToast('Thông báo', 'Hợp đồng này đã tồn tại', 'warning');
+                return;
+            }
+
+            contracts.push({
+                id: 'contract_' + Date.now(),
+                name,
+                url,
+                description: description || '',
+                markers: [],
+                createdAt: new Date().toISOString()
+            });
+
+            saveContracts();
+            renderContractSelect();
+            showToast('Thành công', `Đã thêm hợp đồng: ${name}`, 'success');
+        }
+
+        function addContractManually() {
+            const name = document.getElementById('newContractName').value.trim();
+            const url = document.getElementById('newContractUrl').value.trim();
+
+            if (!name || !url) {
+                showToast('Lỗi', 'Vui lòng nhập đầy đủ tên và URL', 'error');
+                return;
+            }
+
+            addContract({ name, url });
+            
+            document.getElementById('newContractName').value = '';
+            document.getElementById('newContractUrl').value = '';
+        }
+
+        function deleteSelectedContract() {
+            const select = document.getElementById('contractSelect');
+            const index = parseInt(select.value);
+            
+            if (isNaN(index)) return;
+            
+            if (confirm(`Bạn có chắc muốn xóa hợp đồng "${contracts[index].name}"?`)) {
+                contracts.splice(index, 1);
+                saveContracts();
+                renderContractSelect();
+                currentContract = null;
+                currentPdf = null;
+                markers = [];
+                
+                document.getElementById('pdfContainer').innerHTML = `
+                    <div class="alert alert-secondary text-center m-4">
+                        <i class="bi bi-arrow-left-circle me-2"></i>
+                        Chọn một hợp đồng từ menu bên trái để bắt đầu chỉnh sửa
+                    </div>
+                `;
+                document.getElementById('deleteContractBtn').style.display = 'none';
+                document.getElementById('pageNavigation').style.display = 'none';
+                document.getElementById('pageInfo').style.display = 'none';
+                document.getElementById('saveBtn').disabled = true;
+                document.getElementById('clearMarkersBtn').disabled = true;
+                
+                showToast('Đã xóa', 'Hợp đồng đã được xóa', 'success');
+            }
+        }
+
+        // ========== PLACEHOLDERS MANAGEMENT ==========
+        function loadCustomPlaceholders() {
+            const saved = localStorage.getItem(PLACEHOLDERS_KEY);
+            customPlaceholders = saved ? JSON.parse(saved) : [];
+        }
+
+        function saveCustomPlaceholders() {
+            localStorage.setItem(PLACEHOLDERS_KEY, JSON.stringify(customPlaceholders));
+        }
+
+        function getAllPlaceholders() {
+            return [...DEFAULT_PLACEHOLDERS, ...customPlaceholders];
+        }
+
+        function renderPlaceholders() {
+            const container = document.getElementById('placeholdersList');
+            container.innerHTML = '';
+            
+            const allPlaceholders = getAllPlaceholders();
+            
+            allPlaceholders.forEach((placeholder, index) => {
+                const div = document.createElement('div');
+                div.className = `placeholder-item ${placeholder.isDefault ? '' : 'custom-placeholder'}`;
+                div.draggable = true;
+                div.dataset.field = placeholder.field;
+                div.dataset.label = placeholder.label;
+                
+                div.innerHTML = `
+                    <i class="${placeholder.icon || 'bi-tag'} me-2"></i>
+                    <span>${placeholder.label}</span>
+                    ${!placeholder.isDefault ? `<i class="bi bi-x-circle delete-placeholder" onclick="deleteCustomPlaceholder('${placeholder.field}')"></i>` : ''}
+                `;
+                
+                // Drag events
+                div.addEventListener('dragstart', (e) => {
+                    draggedPlaceholder = {
+                        field: placeholder.field,
+                        label: placeholder.label
+                    };
+                    div.classList.add('dragging');
+                });
+                
+                div.addEventListener('dragend', () => {
+                    div.classList.remove('dragging');
+                });
+                
+                container.appendChild(div);
+            });
+        }
+
+        function addCustomPlaceholder() {
+            const name = document.getElementById('newPlaceholderName').value.trim();
+            const field = document.getElementById('newPlaceholderField').value.trim().toLowerCase().replace(/\s+/g, '_');
+            
+            if (!name || !field) {
+                showToast('Lỗi', 'Vui lòng nhập đầy đủ thông tin', 'error');
+                return;
+            }
+
+            // Check duplicate
+            const allPlaceholders = getAllPlaceholders();
+            if (allPlaceholders.some(p => p.field === field)) {
+                showToast('Lỗi', 'Tên biến đã tồn tại', 'error');
+                return;
+            }
+
+            customPlaceholders.push({
+                field,
+                label: name,
+                icon: 'bi-tag-fill',
+                isDefault: false
+            });
+
+            saveCustomPlaceholders();
+            renderPlaceholders();
+            
+            document.getElementById('newPlaceholderName').value = '';
+            document.getElementById('newPlaceholderField').value = '';
+            
+            showToast('Thành công', `Đã thêm placeholder: ${name}`, 'success');
+        }
+
+        function deleteCustomPlaceholder(field) {
+            if (confirm('Bạn có chắc muốn xóa placeholder này?')) {
+                customPlaceholders = customPlaceholders.filter(p => p.field !== field);
+                saveCustomPlaceholders();
+                renderPlaceholders();
+                showToast('Đã xóa', 'Placeholder đã được xóa', 'success');
+            }
+        }
+
+        // ========== PDF LOADING & RENDERING ==========
+        async function loadContract() {
+            const select = document.getElementById('contractSelect');
+            const index = parseInt(select.value);
+            
+            if (isNaN(index)) {
+                document.getElementById('deleteContractBtn').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('deleteContractBtn').style.display = 'block';
+            
+            currentContract = contracts[index];
+            markers = currentContract.markers || [];
+            
+            try {
+                document.getElementById('pdfContainer').innerHTML = `
+                    <div class="text-center p-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-3">Đang tải PDF...</p>
+                    </div>
+                `;
+                
+                // Initialize PDF.js
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                
+                // Load PDF
+                currentPdf = await pdfjsLib.getDocument(currentContract.url).promise;
+                totalPages = currentPdf.numPages;
+                currentPage = 1;
+                
+                await renderPage(currentPage);
+                
+                document.getElementById('saveBtn').disabled = false;
+                document.getElementById('clearMarkersBtn').disabled = false;
+                document.getElementById('pageNavigation').style.display = totalPages > 1 ? 'flex' : 'none';
+                document.getElementById('pageInfo').style.display = 'block';
+                document.getElementById('totalPages').textContent = totalPages;
+                
+                updatePageNavigation();
+                
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                document.getElementById('pdfContainer').innerHTML = `
+                    <div class="alert alert-danger m-4">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Lỗi khi tải PDF: ${error.message}
+                        <br><small>URL: ${currentContract.url}</small>
+                    </div>
+                `;
+            }
+        }
+
+        async function renderPage(pageNum) {
+            const page = await currentPdf.getPage(pageNum);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+            
+            const container = document.getElementById('pdfContainer');
+            container.innerHTML = '';
+            
+            // Create page wrapper
+            const pageWrapper = document.createElement('div');
+            pageWrapper.className = 'pdf-page';
+            pageWrapper.id = 'pdfPage';
+            pageWrapper.style.width = viewport.width + 'px';
+            pageWrapper.style.height = viewport.height + 'px';
+            pageWrapper.style.position = 'relative';
+            
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            const context = canvas.getContext('2d');
+            await page.render({ canvasContext: context, viewport }).promise;
+            
+            pageWrapper.appendChild(canvas);
+            
+            // Create markers container
+            const markersContainer = document.createElement('div');
+            markersContainer.id = 'markersContainer';
+            markersContainer.style.position = 'absolute';
+            markersContainer.style.top = '0';
+            markersContainer.style.left = '0';
+            markersContainer.style.width = '100%';
+            markersContainer.style.height = '100%';
+            pageWrapper.appendChild(markersContainer);
+            
+            container.appendChild(pageWrapper);
+            
+            // Setup drag & drop
+            setupDragDrop(pageWrapper);
+            
+            // Render existing markers for this page
+            renderMarkers();
+            
+            document.getElementById('currentPageNum').textContent = pageNum;
+        }
+
+        function setupDragDrop(pageWrapper) {
+            pageWrapper.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                pageWrapper.style.outline = '3px solid #667eea';
+            });
+            
+            pageWrapper.addEventListener('dragleave', () => {
+                pageWrapper.style.outline = 'none';
+            });
+            
+            pageWrapper.addEventListener('drop', (e) => {
+                e.preventDefault();
+                pageWrapper.style.outline = 'none';
+                
+                if (!draggedPlaceholder) return;
+                
+                const rect = pageWrapper.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Add marker
+                markers.push({
+                    id: 'marker_' + Date.now(),
+                    field: draggedPlaceholder.field,
+                    label: draggedPlaceholder.label,
+                    page: currentPage,
+                    x,
+                    y
+                });
+                
+                renderMarkers();
+                draggedPlaceholder = null;
+            });
+        }
+
+        function renderMarkers() {
+            const container = document.getElementById('markersContainer');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            // Only show markers for current page
+            const pageMarkers = markers.filter(m => m.page === currentPage);
+            
+            pageMarkers.forEach(marker => {
+                const div = document.createElement('div');
+                div.className = 'field-marker';
+                div.style.left = marker.x + 'px';
+                div.style.top = marker.y + 'px';
+                div.innerHTML = `
+                    ${marker.label}
+                    <i class="bi bi-x-circle remove-marker" onclick="removeMarker('${marker.id}')"></i>
+                `;
+                
+                // Make draggable to reposition
+                div.draggable = true;
+                div.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('markerId', marker.id);
+                });
+                
+                container.appendChild(div);
+            });
+            
+            // Handle marker repositioning
+            container.addEventListener('dragover', (e) => e.preventDefault());
+            container.addEventListener('drop', (e) => {
+                const markerId = e.dataTransfer.getData('markerId');
+                if (markerId) {
+                    const marker = markers.find(m => m.id === markerId);
+                    if (marker) {
+                        const rect = container.getBoundingClientRect();
+                        marker.x = e.clientX - rect.left;
+                        marker.y = e.clientY - rect.top;
+                        renderMarkers();
+                    }
+                }
+            });
+        }
+
+        function removeMarker(markerId) {
+            markers = markers.filter(m => m.id !== markerId);
+            renderMarkers();
+        }
+
+        function clearAllMarkers() {
+            if (confirm('Bạn có chắc muốn xóa tất cả marker?')) {
+                markers = [];
+                renderMarkers();
+                showToast('Đã xóa', 'Tất cả marker đã được xóa', 'success');
+            }
+        }
+
+        // ========== PAGE NAVIGATION ==========
+        async function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                await renderPage(currentPage);
+                updatePageNavigation();
+            }
+        }
+
+        async function nextPage() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                await renderPage(currentPage);
+                updatePageNavigation();
+            }
+        }
+
+        function updatePageNavigation() {
+            document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+            document.getElementById('pageIndicator').textContent = `${currentPage} / ${totalPages}`;
+        }
+
+        // ========== SAVE CONFIG ==========
+        function saveContractConfig() {
+            if (!currentContract) return;
+            
+            const select = document.getElementById('contractSelect');
+            const index = parseInt(select.value);
+            
+            contracts[index].markers = markers;
+            saveContracts();
+            
+            showToast('Đã lưu', 'Cấu hình đã được lưu thành công', 'success');
+        }
+
+        // ========== TOAST NOTIFICATION ==========
+        function showToast(title, message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastBody = document.getElementById('toastBody');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastTitle.textContent = title;
+            toastBody.textContent = message;
+            
+            toastIcon.className = 'bi me-2';
+            if (type === 'success') {
+                toastIcon.classList.add('bi-check-circle-fill', 'text-success');
+            } else if (type === 'error') {
+                toastIcon.classList.add('bi-x-circle-fill', 'text-danger');
+            } else if (type === 'warning') {
+                toastIcon.classList.add('bi-exclamation-circle-fill', 'text-warning');
+            }
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+
+        // ========== EXPOSE FOR N8N ==========
+        window.addContractFromN8n = addContract;
+    </script>
 </body>
 </html>
