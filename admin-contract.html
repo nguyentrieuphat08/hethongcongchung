@@ -160,19 +160,63 @@
                             <i class="bi bi-plus-circle me-2"></i>Thêm hợp đồng mới
                         </div>
                         <div class="card-body">
-                            <div class="row g-3">
-                                <div class="col-md-4">
-                                    <label class="form-label">Tên hợp đồng</label>
-                                    <input type="text" class="form-control" id="newContractName" placeholder="VD: Hợp đồng mua bán nhà">
-                                </div>
-                                <div class="col-md-5">
-                                    <label class="form-label">URL file PDF</label>
-                                    <input type="text" class="form-control" id="newContractUrl" placeholder="https://drive.google.com/...">
-                                </div>
-                                <div class="col-md-3 d-flex align-items-end">
-                                    <button class="btn btn-primary w-100" onclick="addContractManually()">
-                                        <i class="bi bi-plus-lg me-2"></i>Thêm hợp đồng
+                            <!-- Tab để chọn cách thêm -->
+                            <ul class="nav nav-tabs mb-3" id="addContractTab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-pane" type="button">
+                                        <i class="bi bi-upload me-1"></i>Upload từ máy tính
                                     </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="url-tab" data-bs-toggle="tab" data-bs-target="#url-pane" type="button">
+                                        <i class="bi bi-link-45deg me-1"></i>Nhập URL
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="addContractTabContent">
+                                <!-- Upload từ máy tính -->
+                                <div class="tab-pane fade show active" id="upload-pane" role="tabpanel">
+                                    <div class="row g-3">
+                                        <div class="col-md-5">
+                                            <label class="form-label">Tên hợp đồng</label>
+                                            <input type="text" class="form-control" id="uploadContractName" placeholder="VD: Hợp đồng mua bán nhà">
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label">Chọn file PDF</label>
+                                            <input type="file" class="form-control" id="uploadContractFile" accept=".pdf">
+                                        </div>
+                                        <div class="col-md-2 d-flex align-items-end">
+                                            <button class="btn btn-primary w-100" onclick="uploadContractFile()">
+                                                <i class="bi bi-upload me-1"></i>Upload
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Nhập URL -->
+                                <div class="tab-pane fade" id="url-pane" role="tabpanel">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Tên hợp đồng</label>
+                                            <input type="text" class="form-control" id="newContractName" placeholder="VD: Hợp đồng mua bán nhà">
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label">URL file PDF (phải là link trực tiếp)</label>
+                                            <input type="text" class="form-control" id="newContractUrl" placeholder="https://example.com/file.pdf">
+                                        </div>
+                                        <div class="col-md-3 d-flex align-items-end">
+                                            <button class="btn btn-primary w-100" onclick="addContractManually()">
+                                                <i class="bi bi-plus-lg me-1"></i>Thêm
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-warning mt-3 mb-0">
+                                        <small>
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            <strong>Lưu ý:</strong> Google Drive không hỗ trợ tải trực tiếp. Vui lòng dùng tab "Upload từ máy tính" hoặc dùng các dịch vụ như Dropbox, OneDrive (link trực tiếp).
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -289,8 +333,12 @@
         const API_ENDPOINT = window.location.origin + '/api/receive-contract';
         const CONTRACTS_API = window.location.origin + '/api/contracts';
         
-        // CORS Proxy for Google Drive PDFs
-        const CORS_PROXY = 'https://corsproxy.io/?';
+        // Multiple CORS proxies to try
+        const CORS_PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://proxy.cors.sh/'
+        ];
 
         // Default placeholders
         const DEFAULT_PLACEHOLDERS = [
@@ -469,6 +517,64 @@
             }
         }
 
+        // Upload PDF file from computer
+        function uploadContractFile() {
+            const name = document.getElementById('uploadContractName').value.trim();
+            const fileInput = document.getElementById('uploadContractFile');
+            const file = fileInput.files[0];
+
+            if (!name) {
+                showToast('Lỗi', 'Vui lòng nhập tên hợp đồng', 'error');
+                return;
+            }
+
+            if (!file) {
+                showToast('Lỗi', 'Vui lòng chọn file PDF', 'error');
+                return;
+            }
+
+            if (file.type !== 'application/pdf') {
+                showToast('Lỗi', 'Vui lòng chọn file PDF', 'error');
+                return;
+            }
+
+            // Read file as base64 Data URL
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dataUrl = e.target.result;
+                
+                // Check if duplicate
+                if (contracts.some(c => c.name === name)) {
+                    showToast('Lỗi', 'Tên hợp đồng đã tồn tại', 'error');
+                    return;
+                }
+
+                contracts.push({
+                    id: 'contract_' + Date.now(),
+                    name,
+                    url: dataUrl, // Store as base64 data URL
+                    isLocal: true,
+                    description: '',
+                    markers: [],
+                    createdAt: new Date().toISOString()
+                });
+
+                saveContracts();
+                renderContractSelect();
+                showToast('Thành công', `Đã upload hợp đồng: ${name}`, 'success');
+                
+                // Clear form
+                document.getElementById('uploadContractName').value = '';
+                fileInput.value = '';
+            };
+
+            reader.onerror = function() {
+                showToast('Lỗi', 'Không thể đọc file', 'error');
+            };
+
+            reader.readAsDataURL(file);
+        }
+
         // ========== PLACEHOLDERS MANAGEMENT ==========
         function loadCustomPlaceholders() {
             const saved = localStorage.getItem(PLACEHOLDERS_KEY);
@@ -562,40 +668,19 @@
 
         // ========== PDF LOADING & RENDERING ==========
         function getPdfUrl(originalUrl) {
-            // Convert Google Drive view/share link to direct download link
-            let url = originalUrl;
-            
-            // Handle various Google Drive URL formats
-            if (url.includes('drive.google.com')) {
-                // Extract file ID from various formats
-                let fileId = null;
-                
-                if (url.includes('/file/d/')) {
-                    // Format: https://drive.google.com/file/d/FILE_ID/view
-                    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-                    if (match) fileId = match[1];
-                } else if (url.includes('id=')) {
-                    // Format: https://drive.google.com/uc?id=FILE_ID
-                    const match = url.match(/id=([a-zA-Z0-9_-]+)/);
-                    if (match) fileId = match[1];
-                } else if (url.includes('open?id=')) {
-                    // Format: https://drive.google.com/open?id=FILE_ID
-                    const match = url.match(/open\?id=([a-zA-Z0-9_-]+)/);
-                    if (match) fileId = match[1];
-                }
-                
-                if (fileId) {
-                    // Use Google Drive direct download URL
-                    url = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                }
-                
-                // Use CORS proxy for Google Drive
-                return CORS_PROXY + encodeURIComponent(url);
+            // If it's a data URL (local file), return as is
+            if (originalUrl.startsWith('data:')) {
+                return originalUrl;
             }
             
-            // For other URLs, check if they need CORS proxy
-            // You can add more conditions here
-            return url;
+            // If it's a direct PDF link (not Google Drive), return as is
+            if (!originalUrl.includes('drive.google.com')) {
+                return originalUrl;
+            }
+            
+            // Google Drive is not supported for direct loading
+            // Return null to show error message
+            return null;
         }
 
         async function loadContract() {
@@ -623,9 +708,26 @@
                 // Initialize PDF.js
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
                 
-                // Get PDF URL with CORS proxy if needed
+                // Get PDF URL
                 const pdfUrl = getPdfUrl(currentContract.url);
-                console.log('Loading PDF from:', pdfUrl);
+                
+                if (pdfUrl === null) {
+                    document.getElementById('pdfContainer').innerHTML = `
+                        <div class="alert alert-danger m-4">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Không thể tải PDF từ Google Drive</strong>
+                            <br><br>
+                            Google Drive không cho phép tải trực tiếp từ web. Vui lòng:
+                            <ol class="mt-2 mb-0">
+                                <li>Tải file PDF về máy tính</li>
+                                <li>Dùng tab <strong>"Upload từ máy tính"</strong> để upload lên</li>
+                            </ol>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                console.log('Loading PDF from:', pdfUrl.substring(0, 100) + '...');
                 
                 // Load PDF
                 currentPdf = await pdfjsLib.getDocument(pdfUrl).promise;
