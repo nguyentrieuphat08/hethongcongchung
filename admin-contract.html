@@ -1216,31 +1216,31 @@
             btn.disabled = true;
 
             try {
-                // Get document text content
-                let documentText = '';
+                // Get document text content and positions
+                let textPositions = [];
                 const fileType = currentContract.fileType || 'pdf';
                 
                 if (fileType === 'word') {
-                    // Get text from Word document
-                    const wordContent = document.getElementById('wordContent');
-                    if (wordContent) {
-                        documentText = wordContent.innerText || wordContent.textContent;
-                    }
+                    // Get text positions from Word document
+                    textPositions = getWordTextPositions();
                 } else {
-                    // Get text from PDF
-                    documentText = await extractPdfText();
+                    // Get text positions from PDF
+                    textPositions = await getPdfTextPositions();
                 }
 
-                if (!documentText || documentText.trim().length < 50) {
+                if (!textPositions || textPositions.length < 10) {
                     throw new Error('Không thể đọc nội dung hợp đồng');
                 }
+
+                // Get full text for AI
+                const documentText = textPositions.map(t => t.text).join(' ');
 
                 // Call Gemini API
                 const placeholderSuggestions = await callGeminiAPI(documentText);
                 
                 if (placeholderSuggestions && placeholderSuggestions.length > 0) {
-                    // Show suggestions in modal
-                    showAISuggestions(placeholderSuggestions);
+                    // Auto place markers at detected positions
+                    autoPlaceMarkers(placeholderSuggestions, textPositions);
                 } else {
                     showToast('Thông báo', 'AI không tìm thấy vị trí phù hợp để đặt placeholder', 'warning');
                 }
@@ -1252,6 +1252,187 @@
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
+        }
+
+        function getWordTextPositions() {
+            const positions = [];
+            const wordContent = document.getElementById('wordContent');
+            if (!wordContent) return positions;
+
+            // Get all text nodes with their positions
+            const walker = document.createTreeWalker(wordContent, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while (node = walker.nextNode()) {
+                const text = node.textContent.trim();
+                if (text.length > 0) {
+                    const range = document.createRange();
+                    range.selectNodeContents(node);
+                    const rect = range.getBoundingClientRect();
+                    const containerRect = document.getElementById('pdfPage').getBoundingClientRect();
+                    
+                    positions.push({
+                        text: text,
+                        x: rect.left - containerRect.left,
+                        y: rect.top - containerRect.top,
+                        width: rect.width,
+                        height: rect.height,
+                        page: 1
+                    });
+                }
+            }
+            return positions;
+        }
+
+        async function getPdfTextPositions() {
+            if (!currentPdf) return [];
+            
+            const positions = [];
+            const page = await currentPdf.getPage(currentPage);
+            const textContent = await page.getTextContent();
+            const viewport = page.getViewport({ scale: pdfScale });
+            
+            textContent.items.forEach(item => {
+                const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+                positions.push({
+                    text: item.str,
+                    x: tx[4],
+                    y: viewport.height - tx[5] - (item.height || 12) * pdfScale,
+                    width: item.width * pdfScale,
+                    height: (item.height || 12) * pdfScale,
+                    page: currentPage
+                });
+            });
+            
+            return positions;
+        }
+
+        function autoPlaceMarkers(suggestions, textPositions) {
+            let placedCount = 0;
+            const allPlaceholders = getAllPlaceholders();
+            
+            suggestions.forEach(suggestion => {
+                // Find matching text position using searchKeyword
+                const searchKeyword = (suggestion.searchKeyword || suggestion.originalText || '').toLowerCase().trim();
+                let bestMatch = null;
+                let bestScore = 0;
+                
+                // First pass: exact keyword match
+                for (const pos of textPositions) {
+                    const posText = pos.text.toLowerCase();
+                    
+                    // Check if this text contains the search keyword
+                    if (posText.includes(searchKeyword) || searchKeyword.includes(posText)) {
+                        const score = posText.length * 2;
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMatch = pos;
+                        }
+                    }
+                    
+                    // Partial keyword match (first few chars)
+                    if (searchKeyword.length >= 3) {
+                        const keywordStart = searchKeyword.substring(0, Math.min(6, searchKeyword.length));
+                        if (posText.includes(keywordStart)) {
+                            const score = posText.length;
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestMatch = pos;
+                            }
+                        }
+                    }
+                }
+                
+                // Second pass: field type keywords
+                if (!bestMatch) {
+                    const fieldKeywords = {
+                        'fullname': ['ông', 'bà', 'họ tên', 'họ và tên', 'tên:', 'người'],
+                        'birthday': ['ngày sinh', 'sinh ngày', 'năm sinh', 'sinh năm'],
+                        'idcard': ['cccd', 'cmnd', 'căn cước', 'chứng minh', 'số:'],
+                        'address': ['địa chỉ', 'thường trú', 'cư trú', 'nơi ở', 'tại:'],
+                        'phone': ['điện thoại', 'số đt', 'phone', 'đt:', 'tel'],
+                        'email': ['email', 'e-mail', 'thư điện tử'],
+                        'money': ['số tiền', 'giá', 'tiền', 'vnd', 'đồng'],
+                        'date': ['ngày', 'tháng', 'năm']
+                    };
+                    
+                    // Find matching field type
+                    let matchedKeywords = [];
+                    for (const [fieldType, keywords] of Object.entries(fieldKeywords)) {
+                        if (suggestion.field.toLowerCase().includes(fieldType) || 
+                            suggestion.label.toLowerCase().includes(fieldType)) {
+                            matchedKeywords = keywords;
+                            break;
+                        }
+                    }
+                    
+                    // Also check the search keyword for field type hints
+                    for (const [fieldType, keywords] of Object.entries(fieldKeywords)) {
+                        for (const kw of keywords) {
+                            if (searchKeyword.includes(kw)) {
+                                matchedKeywords = [...matchedKeywords, ...keywords];
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Search for field type keywords
+                    for (const pos of textPositions) {
+                        const posText = pos.text.toLowerCase();
+                        for (const kw of matchedKeywords) {
+                            if (posText.includes(kw)) {
+                                bestMatch = pos;
+                                break;
+                            }
+                        }
+                        if (bestMatch) break;
+                    }
+                }
+                
+                // Add placeholder to custom list if not exists
+                if (!allPlaceholders.some(p => p.field === suggestion.field)) {
+                    customPlaceholders.push({
+                        field: suggestion.field,
+                        label: suggestion.label,
+                        icon: 'bi-robot',
+                        isDefault: false,
+                        sampleData: suggestion.sampleData || suggestion.label
+                    });
+                }
+                
+                // Place marker if position found
+                if (bestMatch) {
+                    // Position marker after the label text
+                    const markerX = Math.min(bestMatch.x + bestMatch.width + 10, 550);
+                    const markerY = bestMatch.y;
+                    
+                    // Check if marker already exists at similar position
+                    const exists = markers.some(m => 
+                        m.field === suggestion.field && 
+                        Math.abs(m.x - markerX) < 50 && 
+                        Math.abs(m.y - markerY) < 20
+                    );
+                    
+                    if (!exists) {
+                        markers.push({
+                            id: 'marker_' + Date.now() + '_' + placedCount,
+                            field: suggestion.field,
+                            label: suggestion.label,
+                            sampleData: suggestion.sampleData || suggestion.label,
+                            page: bestMatch.page || currentPage,
+                            x: markerX,
+                            y: markerY
+                        });
+                        placedCount++;
+                    }
+                }
+            });
+            
+            // Save and render
+            saveCustomPlaceholders();
+            renderPlaceholders();
+            renderMarkers();
+            
+            showToast('Thành công', `AI đã tự động đặt ${placedCount}/${suggestions.length} placeholder. Bạn có thể kéo thả để điều chỉnh vị trí.`, 'success');
         }
 
         async function extractPdfText() {
@@ -1268,28 +1449,35 @@
         }
 
         async function callGeminiAPI(documentText) {
-            const prompt = `Bạn là chuyên gia phân tích hợp đồng pháp lý Việt Nam. 
+            const prompt = `Bạn là chuyên gia phân tích hợp đồng/văn bản pháp lý Việt Nam.
 
-Phân tích nội dung hợp đồng sau và tìm các vị trí cần điền thông tin cá nhân/doanh nghiệp.
+Phân tích nội dung hợp đồng sau và tìm các vị trí cần điền thông tin.
 
 Hợp đồng:
 """
-${documentText.substring(0, 8000)}
+${documentText.substring(0, 10000)}
 """
 
 Yêu cầu:
 1. Tìm các vị trí cần điền thông tin như: họ tên, ngày sinh, số CCCD/CMND, địa chỉ, số điện thoại, email, ngày tháng, số tiền, tên công ty, mã số thuế, chức vụ, v.v.
-2. Xác định text gốc trong hợp đồng tại vị trí đó (ví dụ: "Ông/Bà:...", "Số CCCD:...", "Ngày...tháng...năm...")
-3. Đề xuất placeholder phù hợp
+2. QUAN TRỌNG: "searchKeyword" phải là từ khóa CHÍNH XÁC xuất hiện trong văn bản, dùng để tìm vị trí đặt placeholder. Ví dụ: "Ông:", "CCCD số:", "Địa chỉ:", "Điện thoại:"
+3. Mỗi placeholder nên có từ khóa tìm kiếm khác nhau để đặt đúng vị trí
 
 Trả về JSON array với format:
 [
   {
-    "originalText": "đoạn text gốc cần thay thế",
-    "field": "tên_biến_placeholder",
+    "searchKeyword": "từ khóa chính xác trong văn bản để tìm vị trí",
+    "field": "ten_bien",
     "label": "Tên hiển thị",
     "sampleData": "Dữ liệu mẫu"
   }
+]
+
+Ví dụ:
+[
+  {"searchKeyword": "Ông:", "field": "fullname_1", "label": "Họ tên bên A", "sampleData": "Nguyễn Văn A"},
+  {"searchKeyword": "CCCD số:", "field": "idcard_1", "label": "Số CCCD bên A", "sampleData": "012345678901"},
+  {"searchKeyword": "Địa chỉ thường trú:", "field": "address_1", "label": "Địa chỉ bên A", "sampleData": "123 Đường ABC, Quận 1, TP.HCM"}
 ]
 
 Chỉ trả về JSON array, không có text khác.`;
@@ -1306,7 +1494,7 @@ Chỉ trả về JSON array, không có text khác.`;
                         }]
                     }],
                     generationConfig: {
-                        temperature: 0.2,
+                        temperature: 0.1,
                         maxOutputTokens: 4096
                     }
                 })
