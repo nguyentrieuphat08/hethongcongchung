@@ -312,6 +312,9 @@
                                 <button class="btn btn-info w-100 mt-2" onclick="autoDetectPlaceholders()" id="aiDetectBtn" disabled>
                                     <i class="bi bi-robot me-2"></i>AI tự động đặt placeholder
                                 </button>
+                                <button class="btn btn-outline-danger w-100 mt-2" onclick="clearCustomPlaceholders()">
+                                    <i class="bi bi-trash me-2"></i>Xóa placeholder tùy chỉnh
+                                </button>
                             </div>
                         </div>
 
@@ -859,6 +862,21 @@
                 saveCustomPlaceholders();
                 renderPlaceholders();
                 showToast('Đã xóa', 'Placeholder đã được xóa', 'success');
+            }
+        }
+
+        function clearCustomPlaceholders() {
+            if (customPlaceholders.length === 0) {
+                showToast('Thông báo', 'Không có placeholder tùy chỉnh nào để xóa', 'warning');
+                return;
+            }
+            
+            if (confirm(`Bạn có chắc muốn xóa tất cả ${customPlaceholders.length} placeholder tùy chỉnh? Các placeholder mặc định sẽ được giữ lại.`)) {
+                const count = customPlaceholders.length;
+                customPlaceholders = [];
+                saveCustomPlaceholders();
+                renderPlaceholders();
+                showToast('Đã xóa', `Đã xóa ${count} placeholder tùy chỉnh`, 'success');
             }
         }
 
