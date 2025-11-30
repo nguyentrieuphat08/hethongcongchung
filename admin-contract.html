@@ -309,6 +309,9 @@
                                 <button class="btn btn-warning w-100 mt-2" onclick="clearAllMarkers()" id="clearMarkersBtn" disabled>
                                     <i class="bi bi-eraser me-2"></i>Xóa tất cả marker
                                 </button>
+                                <button class="btn btn-info w-100 mt-2" onclick="autoDetectPlaceholders()" id="aiDetectBtn" disabled>
+                                    <i class="bi bi-robot me-2"></i>AI tự động đặt placeholder
+                                </button>
                             </div>
                         </div>
 
@@ -369,6 +372,8 @@
         const PLACEHOLDERS_KEY = 'custom_placeholders';
         const API_ENDPOINT = window.location.origin + '/api/receive-contract';
         const CONTRACTS_API = window.location.origin + '/api/contracts';
+        const GEMINI_API_KEY = 'AIzaSyB4Yl2FMEVC8UTVa8JmSyNDtyJOrT06F70';
+        const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
         
         // Multiple CORS proxies to try
         const CORS_PROXIES = [
@@ -941,6 +946,7 @@
                 
                 document.getElementById('saveBtn').disabled = false;
                 document.getElementById('clearMarkersBtn').disabled = false;
+                document.getElementById('aiDetectBtn').disabled = false;
                 document.getElementById('pageNavigation').style.display = totalPages > 1 ? 'flex' : 'none';
                 document.getElementById('pageInfo').style.display = 'block';
                 document.getElementById('totalPages').textContent = totalPages;
@@ -1030,6 +1036,7 @@
                 
                 document.getElementById('saveBtn').disabled = false;
                 document.getElementById('clearMarkersBtn').disabled = false;
+                document.getElementById('aiDetectBtn').disabled = false;
                 document.getElementById('pageNavigation').style.display = 'none';
                 document.getElementById('pageInfo').style.display = 'block';
                 document.getElementById('totalPages').textContent = '1';
@@ -1194,6 +1201,256 @@
             
             const bsToast = new bootstrap.Toast(toast);
             bsToast.show();
+        }
+
+        // ========== AI AUTO DETECT PLACEHOLDERS ==========
+        async function autoDetectPlaceholders() {
+            if (!currentContract) {
+                showToast('Lỗi', 'Vui lòng chọn hợp đồng trước', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('aiDetectBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>AI đang phân tích...';
+            btn.disabled = true;
+
+            try {
+                // Get document text content
+                let documentText = '';
+                const fileType = currentContract.fileType || 'pdf';
+                
+                if (fileType === 'word') {
+                    // Get text from Word document
+                    const wordContent = document.getElementById('wordContent');
+                    if (wordContent) {
+                        documentText = wordContent.innerText || wordContent.textContent;
+                    }
+                } else {
+                    // Get text from PDF
+                    documentText = await extractPdfText();
+                }
+
+                if (!documentText || documentText.trim().length < 50) {
+                    throw new Error('Không thể đọc nội dung hợp đồng');
+                }
+
+                // Call Gemini API
+                const placeholderSuggestions = await callGeminiAPI(documentText);
+                
+                if (placeholderSuggestions && placeholderSuggestions.length > 0) {
+                    // Show suggestions in modal
+                    showAISuggestions(placeholderSuggestions);
+                } else {
+                    showToast('Thông báo', 'AI không tìm thấy vị trí phù hợp để đặt placeholder', 'warning');
+                }
+
+            } catch (error) {
+                console.error('AI Error:', error);
+                showToast('Lỗi', 'Lỗi AI: ' + error.message, 'error');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function extractPdfText() {
+            if (!currentPdf) return '';
+            
+            let fullText = '';
+            for (let i = 1; i <= currentPdf.numPages; i++) {
+                const page = await currentPdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+            return fullText;
+        }
+
+        async function callGeminiAPI(documentText) {
+            const prompt = `Bạn là chuyên gia phân tích hợp đồng pháp lý Việt Nam. 
+
+Phân tích nội dung hợp đồng sau và tìm các vị trí cần điền thông tin cá nhân/doanh nghiệp.
+
+Hợp đồng:
+"""
+${documentText.substring(0, 8000)}
+"""
+
+Yêu cầu:
+1. Tìm các vị trí cần điền thông tin như: họ tên, ngày sinh, số CCCD/CMND, địa chỉ, số điện thoại, email, ngày tháng, số tiền, tên công ty, mã số thuế, chức vụ, v.v.
+2. Xác định text gốc trong hợp đồng tại vị trí đó (ví dụ: "Ông/Bà:...", "Số CCCD:...", "Ngày...tháng...năm...")
+3. Đề xuất placeholder phù hợp
+
+Trả về JSON array với format:
+[
+  {
+    "originalText": "đoạn text gốc cần thay thế",
+    "field": "tên_biến_placeholder",
+    "label": "Tên hiển thị",
+    "sampleData": "Dữ liệu mẫu"
+  }
+]
+
+Chỉ trả về JSON array, không có text khác.`;
+
+            const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: prompt
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.2,
+                        maxOutputTokens: 4096
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error?.message || 'Lỗi gọi Gemini API');
+            }
+
+            const data = await response.json();
+            const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            
+            // Parse JSON from response
+            try {
+                // Extract JSON from response (may have markdown code blocks)
+                let jsonStr = responseText;
+                if (responseText.includes('```json')) {
+                    jsonStr = responseText.split('```json')[1].split('```')[0];
+                } else if (responseText.includes('```')) {
+                    jsonStr = responseText.split('```')[1].split('```')[0];
+                }
+                return JSON.parse(jsonStr.trim());
+            } catch (e) {
+                console.error('Parse error:', e, responseText);
+                throw new Error('Không thể phân tích kết quả từ AI');
+            }
+        }
+
+        function showAISuggestions(suggestions) {
+            // Create modal
+            const modalHtml = `
+                <div class="modal fade" id="aiSuggestionsModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-info text-white">
+                                <h5 class="modal-title"><i class="bi bi-robot me-2"></i>AI đề xuất Placeholder</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="text-muted mb-3">AI đã tìm thấy ${suggestions.length} vị trí có thể đặt placeholder. Chọn các mục bạn muốn thêm:</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th width="40"><input type="checkbox" id="selectAllSuggestions" checked></th>
+                                                <th>Text gốc</th>
+                                                <th>Placeholder</th>
+                                                <th>Dữ liệu mẫu</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${suggestions.map((s, i) => `
+                                                <tr>
+                                                    <td><input type="checkbox" class="suggestion-check" data-index="${i}" checked></td>
+                                                    <td><small class="text-muted">${escapeHtml(s.originalText?.substring(0, 50) || '')}</small></td>
+                                                    <td><strong>${escapeHtml(s.label)}</strong><br><code>${escapeHtml(s.field)}</code></td>
+                                                    <td>${escapeHtml(s.sampleData)}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                                <button type="button" class="btn btn-primary" onclick="applyAISuggestions()">
+                                    <i class="bi bi-check-lg me-1"></i>Áp dụng đã chọn
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove old modal if exists
+            const oldModal = document.getElementById('aiSuggestionsModal');
+            if (oldModal) oldModal.remove();
+
+            // Add new modal
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // Store suggestions for later
+            window.aiSuggestions = suggestions;
+
+            // Setup select all checkbox
+            document.getElementById('selectAllSuggestions').addEventListener('change', function() {
+                document.querySelectorAll('.suggestion-check').forEach(cb => cb.checked = this.checked);
+            });
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('aiSuggestionsModal'));
+            modal.show();
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function applyAISuggestions() {
+            const suggestions = window.aiSuggestions || [];
+            const selectedIndexes = [];
+            
+            document.querySelectorAll('.suggestion-check:checked').forEach(cb => {
+                selectedIndexes.push(parseInt(cb.dataset.index));
+            });
+
+            if (selectedIndexes.length === 0) {
+                showToast('Thông báo', 'Vui lòng chọn ít nhất một placeholder', 'warning');
+                return;
+            }
+
+            // Add placeholders to custom list
+            let addedCount = 0;
+            const allPlaceholders = getAllPlaceholders();
+            
+            selectedIndexes.forEach(index => {
+                const s = suggestions[index];
+                if (s && !allPlaceholders.some(p => p.field === s.field)) {
+                    customPlaceholders.push({
+                        field: s.field,
+                        label: s.label,
+                        icon: 'bi-robot',
+                        isDefault: false,
+                        sampleData: s.sampleData || s.label,
+                        originalText: s.originalText
+                    });
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                saveCustomPlaceholders();
+                renderPlaceholders();
+                showToast('Thành công', `Đã thêm ${addedCount} placeholder từ AI`, 'success');
+            } else {
+                showToast('Thông báo', 'Các placeholder đã tồn tại', 'warning');
+            }
+
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('aiSuggestionsModal')).hide();
         }
 
         // ========== EXPOSE FOR N8N ==========
