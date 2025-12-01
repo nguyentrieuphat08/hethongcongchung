@@ -310,8 +310,16 @@
                                     <i class="bi bi-eraser me-2"></i>Xóa tất cả marker
                                 </button>
                                 <button class="btn btn-info w-100 mt-2" onclick="autoDetectPlaceholders()" id="aiDetectBtn" disabled>
-                                    <i class="bi bi-robot me-2"></i>AI tự động đặt placeholder
+                                    <i class="bi bi-robot me-2"></i>AI tự động chèn placeholder
                                 </button>
+                                <div class="btn-group w-100 mt-2" role="group">
+                                    <button class="btn btn-outline-secondary" onclick="toggleDisplayMode('placeholder')" id="btnShowPlaceholder">
+                                        <i class="bi bi-code me-1"></i>{{field}}
+                                    </button>
+                                    <button class="btn btn-outline-secondary active" onclick="toggleDisplayMode('sample')" id="btnShowSample">
+                                        <i class="bi bi-eye me-1"></i>Mẫu
+                                    </button>
+                                </div>
                                 <button class="btn btn-outline-danger w-100 mt-2" onclick="clearCustomPlaceholders()">
                                     <i class="bi bi-trash me-2"></i>Xóa placeholder tùy chỉnh
                                 </button>
@@ -375,7 +383,7 @@
         const PLACEHOLDERS_KEY = 'custom_placeholders';
         const API_ENDPOINT = window.location.origin + '/api/receive-contract';
         const CONTRACTS_API = window.location.origin + '/api/contracts';
-        const GEMINI_API_KEY = 'AIzaSyB4Yl2FMEVC8UTVa8JmSyNDtyJOrT06F70';
+        const GEMINI_API_KEY = 'AIzaSyCpk0DKaYp_nTBUEPpasKE4rwIG5quPhpQ';
         const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
         
         // Multiple CORS proxies to try
@@ -405,6 +413,9 @@
         let currentPage = 1;
         let totalPages = 1;
         let markers = [];
+        let placeholderMappings = []; // Store placeholder mappings for Word documents
+        let displayMode = 'sample'; // 'sample' or 'placeholder'
+        let originalWordContent = ''; // Store original Word HTML content
         let fontSettings = {
             fontFamily: "'Times New Roman', Times, serif",
             fontSize: 14,
@@ -1042,6 +1053,17 @@
                     useBase64URL: true
                 });
                 
+                // Store original content for reset
+                originalWordContent = contentDiv.innerHTML;
+                
+                // Load placeholder mappings
+                loadPlaceholderMappings();
+                
+                // If there's modified content saved, restore it
+                if (currentContract.modifiedContent) {
+                    contentDiv.innerHTML = currentContract.modifiedContent;
+                }
+                
                 // Enable pointer events for markers after render
                 markersContainer.style.pointerEvents = 'auto';
                 
@@ -1155,10 +1177,28 @@
         }
 
         function clearAllMarkers() {
-            if (confirm('Bạn có chắc muốn xóa tất cả marker?')) {
-                markers = [];
-                renderMarkers();
-                showToast('Đã xóa', 'Tất cả marker đã được xóa', 'success');
+            const fileType = currentContract?.fileType || 'pdf';
+            
+            if (fileType === 'word') {
+                // For Word: reset to original content
+                if (confirm('Bạn có chắc muốn xóa tất cả placeholder đã chèn và khôi phục văn bản gốc?')) {
+                    if (originalWordContent) {
+                        const wordContent = document.getElementById('wordContent');
+                        if (wordContent) {
+                            wordContent.innerHTML = originalWordContent;
+                        }
+                    }
+                    placeholderMappings = [];
+                    savePlaceholderMappings();
+                    showToast('Đã xóa', 'Đã khôi phục văn bản gốc', 'success');
+                }
+            } else {
+                // For PDF: clear markers
+                if (confirm('Bạn có chắc muốn xóa tất cả marker?')) {
+                    markers = [];
+                    renderMarkers();
+                    showToast('Đã xóa', 'Tất cả marker đã được xóa', 'success');
+                }
             }
         }
 
@@ -1192,7 +1232,20 @@
             const select = document.getElementById('contractSelect');
             const index = parseInt(select.value);
             
-            contracts[index].markers = markers;
+            const fileType = currentContract.fileType || 'pdf';
+            
+            if (fileType === 'word') {
+                // For Word: save the modified HTML content and placeholder mappings
+                const wordContent = document.getElementById('wordContent');
+                if (wordContent) {
+                    contracts[index].modifiedContent = wordContent.innerHTML;
+                }
+                contracts[index].placeholderMappings = placeholderMappings;
+            } else {
+                // For PDF: save markers
+                contracts[index].markers = markers;
+            }
+            
             saveContracts();
             
             showToast('Đã lưu', 'Cấu hình đã được lưu thành công', 'success');
@@ -1228,37 +1281,41 @@
                 return;
             }
 
+            const fileType = currentContract.fileType || 'pdf';
+            if (fileType !== 'word') {
+                showToast('Thông báo', 'Tính năng AI chèn placeholder chỉ hỗ trợ file Word (.docx). File PDF sử dụng hệ thống marker overlay.', 'warning');
+                return;
+            }
+
             const btn = document.getElementById('aiDetectBtn');
-            const originalText = btn.innerHTML;
+            const originalBtnText = btn.innerHTML;
             btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>AI đang phân tích...';
             btn.disabled = true;
 
             try {
-                // Get document text content and positions
-                let textPositions = [];
-                const fileType = currentContract.fileType || 'pdf';
-                
-                if (fileType === 'word') {
-                    // Get text positions from Word document
-                    textPositions = getWordTextPositions();
-                } else {
-                    // Get text positions from PDF
-                    textPositions = await getPdfTextPositions();
+                const wordContent = document.getElementById('wordContent');
+                if (!wordContent) {
+                    throw new Error('Không tìm thấy nội dung Word');
                 }
 
-                if (!textPositions || textPositions.length < 10) {
+                // Save original content if not saved
+                if (!originalWordContent) {
+                    originalWordContent = wordContent.innerHTML;
+                }
+
+                // Get text content
+                const documentText = wordContent.innerText || wordContent.textContent;
+                
+                if (!documentText || documentText.trim().length < 50) {
                     throw new Error('Không thể đọc nội dung hợp đồng');
                 }
-
-                // Get full text for AI
-                const documentText = textPositions.map(t => t.text).join(' ');
 
                 // Call Gemini API
                 const placeholderSuggestions = await callGeminiAPI(documentText);
                 
                 if (placeholderSuggestions && placeholderSuggestions.length > 0) {
-                    // Auto place markers at detected positions
-                    autoPlaceMarkers(placeholderSuggestions, textPositions);
+                    // Replace dots with placeholders in Word document
+                    insertPlaceholdersInWord(placeholderSuggestions);
                 } else {
                     showToast('Thông báo', 'AI không tìm thấy vị trí phù hợp để đặt placeholder', 'warning');
                 }
@@ -1267,146 +1324,20 @@
                 console.error('AI Error:', error);
                 showToast('Lỗi', 'Lỗi AI: ' + error.message, 'error');
             } finally {
-                btn.innerHTML = originalText;
+                btn.innerHTML = originalBtnText;
                 btn.disabled = false;
             }
         }
 
-        function getWordTextPositions() {
-            const positions = [];
+        function insertPlaceholdersInWord(suggestions) {
             const wordContent = document.getElementById('wordContent');
-            if (!wordContent) return positions;
+            if (!wordContent) return;
 
-            // Get all text nodes with their positions
-            const walker = document.createTreeWalker(wordContent, NodeFilter.SHOW_TEXT, null, false);
-            let node;
-            while (node = walker.nextNode()) {
-                const text = node.textContent.trim();
-                if (text.length > 0) {
-                    const range = document.createRange();
-                    range.selectNodeContents(node);
-                    const rect = range.getBoundingClientRect();
-                    const containerRect = document.getElementById('pdfPage').getBoundingClientRect();
-                    
-                    positions.push({
-                        text: text,
-                        x: rect.left - containerRect.left,
-                        y: rect.top - containerRect.top,
-                        width: rect.width,
-                        height: rect.height,
-                        page: 1
-                    });
-                }
-            }
-            return positions;
-        }
-
-        async function getPdfTextPositions() {
-            if (!currentPdf) return [];
-            
-            const positions = [];
-            const page = await currentPdf.getPage(currentPage);
-            const textContent = await page.getTextContent();
-            const viewport = page.getViewport({ scale: pdfScale });
-            
-            textContent.items.forEach(item => {
-                const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-                positions.push({
-                    text: item.str,
-                    x: tx[4],
-                    y: viewport.height - tx[5] - (item.height || 12) * pdfScale,
-                    width: item.width * pdfScale,
-                    height: (item.height || 12) * pdfScale,
-                    page: currentPage
-                });
-            });
-            
-            return positions;
-        }
-
-        function autoPlaceMarkers(suggestions, textPositions) {
-            let placedCount = 0;
             const allPlaceholders = getAllPlaceholders();
-            
+
+            // Process each suggestion - add to custom placeholders
             suggestions.forEach(suggestion => {
-                // Find matching text position using searchKeyword
-                const searchKeyword = (suggestion.searchKeyword || suggestion.originalText || '').toLowerCase().trim();
-                let bestMatch = null;
-                let bestScore = 0;
-                
-                // First pass: exact keyword match
-                for (const pos of textPositions) {
-                    const posText = pos.text.toLowerCase();
-                    
-                    // Check if this text contains the search keyword
-                    if (posText.includes(searchKeyword) || searchKeyword.includes(posText)) {
-                        const score = posText.length * 2;
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestMatch = pos;
-                        }
-                    }
-                    
-                    // Partial keyword match (first few chars)
-                    if (searchKeyword.length >= 3) {
-                        const keywordStart = searchKeyword.substring(0, Math.min(6, searchKeyword.length));
-                        if (posText.includes(keywordStart)) {
-                            const score = posText.length;
-                            if (score > bestScore) {
-                                bestScore = score;
-                                bestMatch = pos;
-                            }
-                        }
-                    }
-                }
-                
-                // Second pass: field type keywords
-                if (!bestMatch) {
-                    const fieldKeywords = {
-                        'fullname': ['ông', 'bà', 'họ tên', 'họ và tên', 'tên:', 'người'],
-                        'birthday': ['ngày sinh', 'sinh ngày', 'năm sinh', 'sinh năm'],
-                        'idcard': ['cccd', 'cmnd', 'căn cước', 'chứng minh', 'số:'],
-                        'address': ['địa chỉ', 'thường trú', 'cư trú', 'nơi ở', 'tại:'],
-                        'phone': ['điện thoại', 'số đt', 'phone', 'đt:', 'tel'],
-                        'email': ['email', 'e-mail', 'thư điện tử'],
-                        'money': ['số tiền', 'giá', 'tiền', 'vnd', 'đồng'],
-                        'date': ['ngày', 'tháng', 'năm']
-                    };
-                    
-                    // Find matching field type
-                    let matchedKeywords = [];
-                    for (const [fieldType, keywords] of Object.entries(fieldKeywords)) {
-                        if (suggestion.field.toLowerCase().includes(fieldType) || 
-                            suggestion.label.toLowerCase().includes(fieldType)) {
-                            matchedKeywords = keywords;
-                            break;
-                        }
-                    }
-                    
-                    // Also check the search keyword for field type hints
-                    for (const [fieldType, keywords] of Object.entries(fieldKeywords)) {
-                        for (const kw of keywords) {
-                            if (searchKeyword.includes(kw)) {
-                                matchedKeywords = [...matchedKeywords, ...keywords];
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // Search for field type keywords
-                    for (const pos of textPositions) {
-                        const posText = pos.text.toLowerCase();
-                        for (const kw of matchedKeywords) {
-                            if (posText.includes(kw)) {
-                                bestMatch = pos;
-                                break;
-                            }
-                        }
-                        if (bestMatch) break;
-                    }
-                }
-                
-                // Add placeholder to custom list if not exists
+                // Add to custom placeholders if not exists
                 if (!allPlaceholders.some(p => p.field === suggestion.field)) {
                     customPlaceholders.push({
                         field: suggestion.field,
@@ -1416,41 +1347,150 @@
                         sampleData: suggestion.sampleData || suggestion.label
                     });
                 }
+
+                // Add to placeholderMappings
+                if (!placeholderMappings.some(m => m.field === suggestion.field)) {
+                    placeholderMappings.push({
+                        field: suggestion.field,
+                        label: suggestion.label,
+                        sampleData: suggestion.sampleData || suggestion.label,
+                        contextBefore: suggestion.contextBefore || ''
+                    });
+                }
+            });
+
+            // Replace dots with placeholder spans in the HTML
+            replaceDotsWithPlaceholders(wordContent, suggestions);
+
+            // Save
+            saveCustomPlaceholders();
+            savePlaceholderMappings();
+            renderPlaceholders();
+            
+            const insertedCount = document.querySelectorAll('.placeholder-inline').length;
+            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder vào hợp đồng. Chuyển đổi giữa chế độ {{field}} và Mẫu để xem.`, 'success');
+        }
+
+        function replaceDotsWithPlaceholders(container, suggestions) {
+            // Get HTML content
+            let html = container.innerHTML;
+            
+            // Track which suggestions have been used
+            const usedSuggestions = new Set();
+            
+            // First pass: Use contextBefore from AI suggestions to match
+            suggestions.forEach(suggestion => {
+                if (usedSuggestions.has(suggestion.field)) return;
                 
-                // Place marker if position found
-                if (bestMatch) {
-                    // Position marker after the label text
-                    const markerX = Math.min(bestMatch.x + bestMatch.width + 10, 550);
-                    const markerY = bestMatch.y;
+                const contextBefore = suggestion.contextBefore || '';
+                if (contextBefore.length >= 2) {
+                    // Escape special regex characters
+                    const escapedContext = contextBefore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    // Match context followed by dots/underscores/ellipsis
+                    const regex = new RegExp(`(${escapedContext}[:\\s]*)([\.…_]{2,}|\\.\\.+)`, 'gi');
                     
-                    // Check if marker already exists at similar position
-                    const exists = markers.some(m => 
-                        m.field === suggestion.field && 
-                        Math.abs(m.x - markerX) < 50 && 
-                        Math.abs(m.y - markerY) < 20
-                    );
-                    
-                    if (!exists) {
-                        markers.push({
-                            id: 'marker_' + Date.now() + '_' + placedCount,
-                            field: suggestion.field,
-                            label: suggestion.label,
-                            sampleData: suggestion.sampleData || suggestion.label,
-                            page: bestMatch.page || currentPage,
-                            x: markerX,
-                            y: markerY
-                        });
-                        placedCount++;
-                    }
+                    html = html.replace(regex, (match, prefix, dots) => {
+                        if (usedSuggestions.has(suggestion.field)) return match;
+                        
+                        usedSuggestions.add(suggestion.field);
+                        const displayValue = displayMode === 'sample' ? suggestion.sampleData : `{{${suggestion.field}}}`;
+                        return `${prefix}<span class="placeholder-inline" data-field="${suggestion.field}" data-label="${escapeHtml(suggestion.label)}" data-sample="${escapeHtml(suggestion.sampleData)}" style="background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; border: 1px dashed #ffc107; color: #856404; font-weight: 500;">${displayValue}</span>`;
+                    });
                 }
             });
             
-            // Save and render
-            saveCustomPlaceholders();
-            renderPlaceholders();
-            renderMarkers();
+            // Second pass: Pattern-based matching for common fields
+            const patterns = [
+                { regex: /(Ông|Bà|Họ và tên|Họ tên)[:\s]*([\.…_]{2,})/gi, type: 'fullname' },
+                { regex: /(Địa chỉ[^:]*|Thường trú|Nơi ở|tại địa chỉ)[:\s]*([\.…_]{2,})/gi, type: 'address' },
+                { regex: /(CCCD|CMND|Căn cước|số CCCD|số CMND)[:\s]*([\.…_]{2,})/gi, type: 'idcard' },
+                { regex: /(Điện thoại|Số ĐT|Phone|SĐT|Di động)[:\s]*([\.…_]{2,})/gi, type: 'phone' },
+                { regex: /(Ngày sinh|Sinh ngày|Năm sinh)[:\s]*([\.…_]{2,})/gi, type: 'birthday' },
+                { regex: /(Email|E-mail|Thư điện tử)[:\s]*([\.…_]{2,})/gi, type: 'email' },
+                { regex: /(Số tiền|Giá trị|Trị giá|Tổng tiền)[:\s]*([\.…_]{2,})/gi, type: 'money' },
+                { regex: /(cấp ngày|Ngày cấp)[:\s]*([\.…_]{2,})/gi, type: 'issue_date' },
+            ];
+
+            patterns.forEach(({ regex, type }) => {
+                html = html.replace(regex, (match, prefix, dots) => {
+                    // Find matching suggestion that hasn't been used
+                    const suggestion = suggestions.find(s => 
+                        !usedSuggestions.has(s.field) && 
+                        (s.field.toLowerCase().includes(type) || 
+                         s.label.toLowerCase().includes(type) ||
+                         type.includes(s.field.toLowerCase()))
+                    );
+                    
+                    if (suggestion) {
+                        usedSuggestions.add(suggestion.field);
+                        const displayValue = displayMode === 'sample' ? suggestion.sampleData : `{{${suggestion.field}}}`;
+                        return `${prefix} <span class="placeholder-inline" data-field="${suggestion.field}" data-label="${escapeHtml(suggestion.label)}" data-sample="${escapeHtml(suggestion.sampleData)}" style="background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; border: 1px dashed #ffc107; color: #856404; font-weight: 500;">${displayValue}</span>`;
+                    }
+                    return match;
+                });
+            });
+
+            // Third pass: Replace remaining dots with unused suggestions
+            const remainingSuggestions = suggestions.filter(s => !usedSuggestions.has(s.field));
+            let suggestionIndex = 0;
             
-            showToast('Thành công', `AI đã tự động đặt ${placedCount}/${suggestions.length} placeholder. Bạn có thể kéo thả để điều chỉnh vị trí.`, 'success');
+            // Match any sequence of 3+ dots/underscores that hasn't been replaced
+            html = html.replace(/([\.…_]{3,})/g, (match) => {
+                // Skip if already inside a placeholder span
+                if (suggestionIndex < remainingSuggestions.length) {
+                    const suggestion = remainingSuggestions[suggestionIndex++];
+                    usedSuggestions.add(suggestion.field);
+                    const displayValue = displayMode === 'sample' ? suggestion.sampleData : `{{${suggestion.field}}}`;
+                    return `<span class="placeholder-inline" data-field="${suggestion.field}" data-label="${escapeHtml(suggestion.label)}" data-sample="${escapeHtml(suggestion.sampleData)}" style="background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; border: 1px dashed #ffc107; color: #856404; font-weight: 500;">${displayValue}</span>`;
+                }
+                return match;
+            });
+
+            container.innerHTML = html;
+            
+            console.log(`Replaced ${usedSuggestions.size}/${suggestions.length} placeholders`);
+        }
+
+        function toggleDisplayMode(mode) {
+            displayMode = mode;
+            
+            // Update button states
+            document.getElementById('btnShowPlaceholder').classList.toggle('active', mode === 'placeholder');
+            document.getElementById('btnShowSample').classList.toggle('active', mode === 'sample');
+            
+            // Update all placeholder spans
+            const placeholderSpans = document.querySelectorAll('.placeholder-inline');
+            placeholderSpans.forEach(span => {
+                const field = span.dataset.field;
+                const sample = span.dataset.sample;
+                
+                if (mode === 'placeholder') {
+                    span.textContent = `{{${field}}}`;
+                    span.style.backgroundColor = '#e7f3ff';
+                    span.style.borderColor = '#0d6efd';
+                    span.style.color = '#0a58ca';
+                } else {
+                    span.textContent = sample;
+                    span.style.backgroundColor = '#fff3cd';
+                    span.style.borderColor = '#ffc107';
+                    span.style.color = '#856404';
+                }
+            });
+        }
+
+        function savePlaceholderMappings() {
+            if (currentContract) {
+                currentContract.placeholderMappings = placeholderMappings;
+                saveContracts();
+            }
+        }
+
+        function loadPlaceholderMappings() {
+            if (currentContract && currentContract.placeholderMappings) {
+                placeholderMappings = currentContract.placeholderMappings;
+            } else {
+                placeholderMappings = [];
+            }
         }
 
         async function extractPdfText() {
@@ -1469,33 +1509,36 @@
         async function callGeminiAPI(documentText) {
             const prompt = `Bạn là chuyên gia phân tích hợp đồng/văn bản pháp lý Việt Nam.
 
-Phân tích nội dung hợp đồng sau và tìm các vị trí cần điền thông tin.
+Phân tích nội dung hợp đồng sau và tìm các vị trí cần điền thông tin (các chỗ có dấu "...", "…", "___" hoặc khoảng trống cần điền).
 
 Hợp đồng:
 """
-${documentText.substring(0, 10000)}
+${documentText.substring(0, 12000)}
 """
 
 Yêu cầu:
-1. Tìm các vị trí cần điền thông tin như: họ tên, ngày sinh, số CCCD/CMND, địa chỉ, số điện thoại, email, ngày tháng, số tiền, tên công ty, mã số thuế, chức vụ, v.v.
-2. QUAN TRỌNG: "searchKeyword" phải là từ khóa CHÍNH XÁC xuất hiện trong văn bản, dùng để tìm vị trí đặt placeholder. Ví dụ: "Ông:", "CCCD số:", "Địa chỉ:", "Điện thoại:"
-3. Mỗi placeholder nên có từ khóa tìm kiếm khác nhau để đặt đúng vị trí
+1. Tìm TẤT CẢ các vị trí có dấu "...", "…", "___" hoặc khoảng trống cần điền thông tin
+2. Xác định loại thông tin cần điền: họ tên, ngày sinh, số CCCD/CMND, địa chỉ, số điện thoại, email, ngày tháng, số tiền, tên công ty, mã số thuế, chức vụ, v.v.
+3. "contextBefore" là từ/cụm từ NGAY TRƯỚC chỗ cần điền (để xác định vị trí)
+4. Nếu có nhiều bên (bên A, bên B), đánh số để phân biệt
 
 Trả về JSON array với format:
 [
   {
-    "searchKeyword": "từ khóa chính xác trong văn bản để tìm vị trí",
-    "field": "ten_bien",
-    "label": "Tên hiển thị",
-    "sampleData": "Dữ liệu mẫu"
+    "contextBefore": "từ/cụm từ ngay trước chỗ điền",
+    "field": "ten_bien_khong_dau",
+    "label": "Tên hiển thị tiếng Việt",
+    "sampleData": "Dữ liệu mẫu thực tế"
   }
 ]
 
-Ví dụ:
+Ví dụ hợp đồng có: "Ông/Bà: ........................ sinh ngày ....../....../......"
+Kết quả:
 [
-  {"searchKeyword": "Ông:", "field": "fullname_1", "label": "Họ tên bên A", "sampleData": "Nguyễn Văn A"},
-  {"searchKeyword": "CCCD số:", "field": "idcard_1", "label": "Số CCCD bên A", "sampleData": "012345678901"},
-  {"searchKeyword": "Địa chỉ thường trú:", "field": "address_1", "label": "Địa chỉ bên A", "sampleData": "123 Đường ABC, Quận 1, TP.HCM"}
+  {"contextBefore": "Ông/Bà:", "field": "fullname_1", "label": "Họ tên", "sampleData": "Nguyễn Văn A"},
+  {"contextBefore": "sinh ngày", "field": "birthday_day", "label": "Ngày sinh", "sampleData": "15"},
+  {"contextBefore": "/", "field": "birthday_month", "label": "Tháng sinh", "sampleData": "06"},
+  {"contextBefore": "/", "field": "birthday_year", "label": "Năm sinh", "sampleData": "1990"}
 ]
 
 Chỉ trả về JSON array, không có text khác.`;
@@ -1513,7 +1556,7 @@ Chỉ trả về JSON array, không có text khác.`;
                     }],
                     generationConfig: {
                         temperature: 0.1,
-                        maxOutputTokens: 4096
+                        maxOutputTokens: 8192
                     }
                 })
             });
