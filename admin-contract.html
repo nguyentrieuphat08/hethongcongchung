@@ -117,30 +117,51 @@
         .field-marker .remove-marker:hover {
             opacity: 1;
         }
-        /* Inline placeholder styles - giống marker nhưng inline trong text */
+        /* Inline placeholder styles - giống marker kéo thả */
         .placeholder-inline {
-            display: inline;
-            background-color: transparent;
-            color: inherit;
-            padding: 0 2px;
-            border: none;
-            cursor: default;
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: inherit;
+            cursor: pointer;
             white-space: nowrap;
             position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            vertical-align: baseline;
+            line-height: inherit;
         }
         .placeholder-inline:hover {
-            background-color: rgba(102, 126, 234, 0.15);
-            border-radius: 2px;
+            background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
         }
         .placeholder-inline .remove-placeholder-inline {
             display: none;
-            margin-left: 4px;
+            margin-left: 6px;
             cursor: pointer;
-            color: #dc3545;
-            font-size: 10px;
+            color: #ffcccc;
+            font-size: 12px;
         }
         .placeholder-inline:hover .remove-placeholder-inline {
             display: inline;
+        }
+        .placeholder-inline .remove-placeholder-inline:hover {
+            color: #ff6666;
+        }
+        /* Placeholder edit popup */
+        .placeholder-edit-popup {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 250px;
+            top: 100%;
+            left: 0;
+            margin-top: 5px;
         }
         .add-placeholder-form {
             background-color: #f8f9fa;
@@ -1413,13 +1434,108 @@
             renderPlaceholders();
             
             const insertedCount = document.querySelectorAll('.placeholder-inline').length;
-            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder vào hợp đồng. Dùng nút "Xem mẫu" / "Xem {{code}}" để chuyển đổi chế độ xem.`, 'success');
+            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder. Click vào placeholder để chỉnh sửa.`, 'success');
         }
 
         function createPlaceholderSpan(field, label, sampleData) {
-            // Tạo placeholder có thể toggle giữa sample và {{field}}
+            // Tạo placeholder giống như marker kéo thả - hiển thị label và sample
             const displayText = viewMode === 'sample' ? sampleData : `{{${field}}}`;
-            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" title="${escapeHtml(label)}: {{${field}}}">${escapeHtml(displayText)}<i class="bi bi-x-circle remove-placeholder-inline" onclick="removeInlinePlaceholder(this)"></i></span>`;
+            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" onclick="editInlinePlaceholder(this)" title="Click để chỉnh sửa"><span class="placeholder-label">${escapeHtml(label)}</span><br><small style="opacity:0.9">${escapeHtml(displayText)}</small><i class="bi bi-x-circle remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i></span>`;
+        }
+
+        function editInlinePlaceholder(span) {
+            // Close any existing popup
+            const existingPopup = document.querySelector('.placeholder-edit-popup');
+            if (existingPopup) existingPopup.remove();
+            
+            const field = span.dataset.field;
+            const label = span.dataset.label;
+            const sample = span.dataset.sample;
+            
+            // Create edit popup
+            const popup = document.createElement('div');
+            popup.className = 'placeholder-edit-popup';
+            popup.innerHTML = `
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Tên hiển thị</label>
+                    <input type="text" class="form-control form-control-sm" id="editLabel" value="${escapeHtml(label)}">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Tên biến (field)</label>
+                    <input type="text" class="form-control form-control-sm" id="editField" value="${escapeHtml(field)}">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Dữ liệu mẫu</label>
+                    <input type="text" class="form-control form-control-sm" id="editSample" value="${escapeHtml(sample)}">
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-primary flex-fill" onclick="saveInlinePlaceholder(this)">
+                        <i class="bi bi-check me-1"></i>Lưu
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.placeholder-edit-popup').remove()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            `;
+            
+            span.style.position = 'relative';
+            span.appendChild(popup);
+            
+            // Focus on first input
+            popup.querySelector('#editLabel').focus();
+            
+            // Close on click outside
+            setTimeout(() => {
+                document.addEventListener('click', function closePopup(e) {
+                    if (!popup.contains(e.target) && e.target !== span) {
+                        popup.remove();
+                        document.removeEventListener('click', closePopup);
+                    }
+                });
+            }, 100);
+        }
+
+        function saveInlinePlaceholder(btn) {
+            const popup = btn.closest('.placeholder-edit-popup');
+            const span = popup.parentElement;
+            
+            const newLabel = popup.querySelector('#editLabel').value.trim();
+            const newField = popup.querySelector('#editField').value.trim().replace(/\s+/g, '_');
+            const newSample = popup.querySelector('#editSample').value.trim();
+            
+            if (!newLabel || !newField) {
+                showToast('Lỗi', 'Vui lòng nhập đầy đủ thông tin', 'error');
+                return;
+            }
+            
+            // Update span data
+            span.dataset.field = newField;
+            span.dataset.label = newLabel;
+            span.dataset.sample = newSample;
+            
+            // Update display
+            const displayText = viewMode === 'sample' ? newSample : `{{${newField}}}`;
+            const labelSpan = span.querySelector('.placeholder-label');
+            if (labelSpan) labelSpan.textContent = newLabel;
+            const smallEl = span.querySelector('small');
+            if (smallEl) smallEl.textContent = displayText;
+            
+            // Update custom placeholders list
+            const existingIdx = customPlaceholders.findIndex(p => p.field === span.dataset.field);
+            if (existingIdx >= 0) {
+                customPlaceholders[existingIdx] = {
+                    field: newField,
+                    label: newLabel,
+                    icon: 'bi-robot',
+                    isDefault: false,
+                    sampleData: newSample
+                };
+            }
+            saveCustomPlaceholders();
+            renderPlaceholders();
+            
+            popup.remove();
+            showToast('Đã lưu', 'Placeholder đã được cập nhật', 'success');
         }
 
         function toggleViewMode(mode) {
@@ -1434,25 +1550,18 @@
             placeholderSpans.forEach(span => {
                 const field = span.dataset.field;
                 const sample = span.dataset.sample;
-                
-                // Get the text node (first child, before the remove icon)
                 const displayText = mode === 'sample' ? sample : `{{${field}}}`;
                 
-                // Update text content but keep the remove icon
-                const removeIcon = span.querySelector('.remove-placeholder-inline');
-                span.textContent = displayText;
-                if (removeIcon) {
-                    span.appendChild(removeIcon);
-                } else {
-                    const newIcon = document.createElement('i');
-                    newIcon.className = 'bi bi-x-circle remove-placeholder-inline';
-                    newIcon.onclick = function() { removeInlinePlaceholder(this); };
-                    span.appendChild(newIcon);
+                // Update the small element
+                const smallEl = span.querySelector('small');
+                if (smallEl) {
+                    smallEl.textContent = displayText;
                 }
             });
         }
 
         function removeInlinePlaceholder(element) {
+            event.stopPropagation();
             const span = element.parentElement;
             if (span && span.classList.contains('placeholder-inline')) {
                 // Thay placeholder bằng dấu ... để có thể chèn lại
