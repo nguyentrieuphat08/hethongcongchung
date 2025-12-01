@@ -826,10 +826,14 @@
                 // HTML5 Drag events
                 div.addEventListener('dragstart', (e) => {
                     if (e.target.classList.contains('delete-placeholder')) return;
+                    
+                    console.log('Dragstart from sidebar:', placeholder.field, placeholder.label);
+                    
+                    e.dataTransfer.setData('text/plain', placeholder.field);
                     e.dataTransfer.setData('field', placeholder.field);
                     e.dataTransfer.setData('label', placeholder.label);
                     e.dataTransfer.setData('sampleData', placeholder.sampleData || placeholder.label);
-                    e.dataTransfer.effectAllowed = 'copy';
+                    e.dataTransfer.effectAllowed = 'all';
                     div.classList.add('dragging');
                 });
                 
@@ -1536,8 +1540,40 @@
 
         // Setup drop zone for Word content - giống n8n
         function setupWordDropZone(contentDiv) {
-            // Make content editable for cursor positioning
+            // Make content và tất cả children chấp nhận drop
             contentDiv.style.cursor = 'text';
+            
+            // Prevent default để cho phép drop
+            const preventAndAllow = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            };
+            
+            // Apply to all descendants
+            const applyDropEvents = function(element) {
+                element.addEventListener('dragover', preventAndAllow);
+                element.addEventListener('dragenter', preventAndAllow);
+            };
+            
+            // Apply to content div and observe for new elements
+            applyDropEvents(contentDiv);
+            
+            // MutationObserver to handle dynamically added content
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) {
+                            applyDropEvents(node);
+                            node.querySelectorAll('*').forEach(applyDropEvents);
+                        }
+                    });
+                });
+            });
+            observer.observe(contentDiv, { childList: true, subtree: true });
+            
+            // Apply to existing children
+            contentDiv.querySelectorAll('*').forEach(applyDropEvents);
             
             // Handle click to set cursor position
             contentDiv.addEventListener('click', function(e) {
@@ -1556,10 +1592,10 @@
                 }
             });
 
-            // Handle dragover
+            // Handle dragover on content div
             contentDiv.addEventListener('dragover', function(e) {
                 e.preventDefault();
-                // Cho phép cả copy (từ sidebar) và move (di chuyển trong content)
+                e.stopPropagation();
                 e.dataTransfer.dropEffect = 'copy';
                 contentDiv.classList.add('drop-active');
                 
@@ -1571,15 +1607,26 @@
                     selection.addRange(range);
                 }
             });
+            
+            // Handle dragenter
+            contentDiv.addEventListener('dragenter', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                contentDiv.classList.add('drop-active');
+            });
 
             // Handle dragleave
             contentDiv.addEventListener('dragleave', function(e) {
-                contentDiv.classList.remove('drop-active');
+                // Only remove class if leaving the contentDiv entirely
+                if (!contentDiv.contains(e.relatedTarget)) {
+                    contentDiv.classList.remove('drop-active');
+                }
             });
 
             // Handle drop - hỗ trợ cả thêm mới và di chuyển placeholder
             contentDiv.addEventListener('drop', function(e) {
                 e.preventDefault();
+                e.stopPropagation();
                 contentDiv.classList.remove('drop-active');
                 
                 // Get dropped placeholder data
@@ -1588,11 +1635,19 @@
                 const sampleData = e.dataTransfer.getData('sampleData');
                 const isMoving = e.dataTransfer.getData('isMoving') === 'true';
                 
-                if (!field) return;
+                console.log('Drop event:', { field, label, sampleData, isMoving });
+                
+                if (!field) {
+                    console.log('No field data in drop');
+                    return;
+                }
                 
                 // Get drop position
                 const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-                if (!range) return;
+                if (!range) {
+                    console.log('No range found at drop position');
+                    return;
+                }
                 
                 // If moving existing placeholder, remove it first
                 if (isMoving) {
