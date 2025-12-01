@@ -337,6 +337,14 @@
                                 <button class="btn btn-info w-100 mt-2" onclick="autoDetectPlaceholders()" id="aiDetectBtn" disabled>
                                     <i class="bi bi-robot me-2"></i>AI tự động chèn placeholder
                                 </button>
+                                <div class="btn-group w-100 mt-2" role="group">
+                                    <button class="btn btn-outline-primary active" onclick="toggleViewMode('sample')" id="btnViewSample">
+                                        <i class="bi bi-eye me-1"></i>Xem mẫu
+                                    </button>
+                                    <button class="btn btn-outline-primary" onclick="toggleViewMode('placeholder')" id="btnViewPlaceholder">
+                                        <i class="bi bi-code me-1"></i>Xem {{code}}
+                                    </button>
+                                </div>
                                 <button class="btn btn-outline-danger w-100 mt-2" onclick="clearCustomPlaceholders()">
                                     <i class="bi bi-trash me-2"></i>Xóa placeholder tùy chỉnh
                                 </button>
@@ -432,6 +440,7 @@
         let markers = [];
         let placeholderMappings = []; // Store placeholder mappings for Word documents
         let originalWordContent = ''; // Store original Word HTML content
+        let viewMode = 'sample'; // 'sample' or 'placeholder' - for admin viewing
         let fontSettings = {
             fontFamily: "'Times New Roman', Times, serif",
             fontSize: 14,
@@ -1251,10 +1260,15 @@
             const fileType = currentContract.fileType || 'pdf';
             
             if (fileType === 'word') {
-                // For Word: save the modified HTML content and placeholder mappings
+                // For Word: save both display content and template
                 const wordContent = document.getElementById('wordContent');
                 if (wordContent) {
+                    // Save current display content
                     contracts[index].modifiedContent = wordContent.innerHTML;
+                    
+                    // Generate template with {{placeholders}} for later use
+                    const template = generateTemplate(wordContent);
+                    contracts[index].template = template;
                 }
                 contracts[index].placeholderMappings = placeholderMappings;
             } else {
@@ -1265,6 +1279,21 @@
             saveContracts();
             
             showToast('Đã lưu', 'Cấu hình đã được lưu thành công', 'success');
+        }
+
+        function generateTemplate(container) {
+            // Clone the container to not affect the display
+            const clone = container.cloneNode(true);
+            
+            // Replace all placeholder spans with {{field}} syntax
+            const placeholders = clone.querySelectorAll('.placeholder-inline');
+            placeholders.forEach(span => {
+                const field = span.dataset.field;
+                const textNode = document.createTextNode(`{{${field}}}`);
+                span.parentNode.replaceChild(textNode, span);
+            });
+            
+            return clone.innerHTML;
         }
 
         // ========== TOAST NOTIFICATION ==========
@@ -1384,12 +1413,43 @@
             renderPlaceholders();
             
             const insertedCount = document.querySelectorAll('.placeholder-inline').length;
-            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder vào hợp đồng. Di chuột vào placeholder để xóa.`, 'success');
+            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder vào hợp đồng. Dùng nút "Xem mẫu" / "Xem {{code}}" để chuyển đổi chế độ xem.`, 'success');
         }
 
         function createPlaceholderSpan(field, label, sampleData) {
-            // Tạo placeholder hiển thị dữ liệu mẫu, có nút xóa khi hover
-            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" title="${escapeHtml(label)}">${escapeHtml(sampleData)}<i class="bi bi-x-circle remove-placeholder-inline" onclick="removeInlinePlaceholder(this)"></i></span>`;
+            // Tạo placeholder có thể toggle giữa sample và {{field}}
+            const displayText = viewMode === 'sample' ? sampleData : `{{${field}}}`;
+            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" title="${escapeHtml(label)}: {{${field}}}">${escapeHtml(displayText)}<i class="bi bi-x-circle remove-placeholder-inline" onclick="removeInlinePlaceholder(this)"></i></span>`;
+        }
+
+        function toggleViewMode(mode) {
+            viewMode = mode;
+            
+            // Update button states
+            document.getElementById('btnViewSample').classList.toggle('active', mode === 'sample');
+            document.getElementById('btnViewPlaceholder').classList.toggle('active', mode === 'placeholder');
+            
+            // Update all placeholder spans
+            const placeholderSpans = document.querySelectorAll('.placeholder-inline');
+            placeholderSpans.forEach(span => {
+                const field = span.dataset.field;
+                const sample = span.dataset.sample;
+                
+                // Get the text node (first child, before the remove icon)
+                const displayText = mode === 'sample' ? sample : `{{${field}}}`;
+                
+                // Update text content but keep the remove icon
+                const removeIcon = span.querySelector('.remove-placeholder-inline');
+                span.textContent = displayText;
+                if (removeIcon) {
+                    span.appendChild(removeIcon);
+                } else {
+                    const newIcon = document.createElement('i');
+                    newIcon.className = 'bi bi-x-circle remove-placeholder-inline';
+                    newIcon.onclick = function() { removeInlinePlaceholder(this); };
+                    span.appendChild(newIcon);
+                }
+            });
         }
 
         function removeInlinePlaceholder(element) {
