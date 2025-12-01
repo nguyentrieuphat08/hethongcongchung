@@ -1651,12 +1651,41 @@
                 // Setup drag for new placeholder
                 setupPlaceholderDrag(placeholder);
                 
-                // Insert at drop position
-                range.insertNode(placeholder);
+                // Kiểm tra và xóa dấu "..." xung quanh vị trí drop
+                const container = range.startContainer;
+                if (container.nodeType === Node.TEXT_NODE) {
+                    const text = container.textContent;
+                    const offset = range.startOffset;
+                    
+                    // Tìm và xóa dấu ... trước và sau vị trí drop
+                    let beforeText = text.substring(0, offset);
+                    let afterText = text.substring(offset);
+                    
+                    // Xóa dấu ... ở cuối beforeText
+                    beforeText = beforeText.replace(/[\.…_]+\s*$/, '');
+                    // Xóa dấu ... ở đầu afterText
+                    afterText = afterText.replace(/^\s*[\.…_]+/, '');
+                    
+                    // Cập nhật text node
+                    container.textContent = beforeText + afterText;
+                    
+                    // Tạo range mới để insert
+                    const newRange = document.createRange();
+                    newRange.setStart(container, beforeText.length);
+                    newRange.collapse(true);
+                    newRange.insertNode(placeholder);
+                } else {
+                    // Insert at drop position (non-text node)
+                    range.insertNode(placeholder);
+                }
                 
                 // Move cursor after placeholder
-                range.setStartAfter(placeholder);
-                range.collapse(true);
+                const sel = window.getSelection();
+                const newRange2 = document.createRange();
+                newRange2.setStartAfter(placeholder);
+                newRange2.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange2);
                 
                 showToast('Đã thêm', `Đã chèn "${label}"`, 'success');
             });
