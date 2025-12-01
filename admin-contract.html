@@ -175,18 +175,23 @@
         .placeholder-inline .remove-placeholder-inline:hover {
             opacity: 1;
         }
-        /* Chế độ xem mẫu - hiển thị text thuần không viền */
+        /* Chế độ xem mẫu - hiển thị text thuần, font kế thừa từ hợp đồng */
         .placeholder-inline.sample-view {
+            display: inline;
             background: transparent;
-            color: #333;
+            color: inherit;
             padding: 0;
             border-radius: 0;
-            font-weight: normal;
+            font-family: inherit;
+            font-size: inherit;
+            font-weight: inherit;
             cursor: default;
             height: auto;
             line-height: inherit;
             margin: 0;
             box-shadow: none;
+            white-space: normal;
+            vertical-align: baseline;
         }
         .placeholder-inline.sample-view:hover {
             background: transparent;
