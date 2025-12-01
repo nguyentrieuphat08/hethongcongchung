@@ -1831,9 +1831,8 @@
             event.stopPropagation();
             const span = element.parentElement;
             if (span && span.classList.contains('placeholder-inline')) {
-                // Thay placeholder bằng dấu ... để có thể chèn lại
-                const textNode = document.createTextNode('...........');
-                span.parentNode.replaceChild(textNode, span);
+                // Xóa placeholder, chỉ để lại khoảng trống
+                span.remove();
                 showToast('Đã xóa', 'Placeholder đã được xóa', 'success');
             }
         }
