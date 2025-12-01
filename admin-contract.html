@@ -54,12 +54,31 @@
             opacity: 0.9;
         }
         .placeholder-item .delete-placeholder {
-            float: right;
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
             cursor: pointer;
             opacity: 0.7;
         }
         .placeholder-item .delete-placeholder:hover {
             opacity: 1;
+        }
+        .placeholder-item {
+            position: relative;
+        }
+        .placeholder-tag {
+            display: inline-block;
+            background: rgba(255,255,255,0.25);
+            color: #fff;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-family: monospace;
+        }
+        .placeholder-item.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
         }
         .custom-placeholder {
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
@@ -117,37 +136,54 @@
         .field-marker .remove-marker:hover {
             opacity: 1;
         }
-        /* Inline placeholder styles - giống marker kéo thả */
+        /* Inline placeholder styles - giống n8n variable tags */
         .placeholder-inline {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: inline-flex;
+            align-items: center;
+            background-color: #ff6d5a;
             color: white;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: inherit;
+            padding: 0 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 500;
             cursor: pointer;
             white-space: nowrap;
-            position: relative;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            vertical-align: baseline;
-            line-height: inherit;
+            height: 20px;
+            line-height: 20px;
+            vertical-align: middle;
+            margin: 0 1px;
         }
         .placeholder-inline:hover {
-            background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
-            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+            background-color: #e55a4a;
         }
         .placeholder-inline .remove-placeholder-inline {
-            display: none;
-            margin-left: 6px;
+            margin-left: 4px;
             cursor: pointer;
-            color: #ffcccc;
-            font-size: 12px;
-        }
-        .placeholder-inline:hover .remove-placeholder-inline {
-            display: inline;
+            opacity: 0.7;
+            font-size: 10px;
         }
         .placeholder-inline .remove-placeholder-inline:hover {
-            color: #ff6666;
+            opacity: 1;
+        }
+        /* Drop zone highlight */
+        .word-content {
+            cursor: text;
+        }
+        .word-content.drop-active {
+            background-color: #fff8e1;
+        }
+        /* Caret indicator */
+        .drop-caret {
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background-color: #ff6d5a;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
         }
         /* Placeholder edit popup */
         .placeholder-edit-popup {
@@ -359,11 +395,11 @@
                                     <i class="bi bi-robot me-2"></i>AI tự động chèn placeholder
                                 </button>
                                 <div class="btn-group w-100 mt-2" role="group">
-                                    <button class="btn btn-outline-primary active" onclick="toggleViewMode('sample')" id="btnViewSample">
-                                        <i class="bi bi-eye me-1"></i>Xem mẫu
+                                    <button class="btn btn-outline-secondary active" onclick="toggleViewMode('label')" id="btnViewLabel">
+                                        <i class="bi bi-tag me-1"></i>Xem Label
                                     </button>
-                                    <button class="btn btn-outline-primary" onclick="toggleViewMode('placeholder')" id="btnViewPlaceholder">
-                                        <i class="bi bi-code me-1"></i>Xem {{code}}
+                                    <button class="btn btn-outline-secondary" onclick="toggleViewMode('sample')" id="btnViewSample">
+                                        <i class="bi bi-eye me-1"></i>Xem Mẫu
                                     </button>
                                 </div>
                                 <button class="btn btn-outline-danger w-100 mt-2" onclick="clearCustomPlaceholders()">
@@ -461,7 +497,7 @@
         let markers = [];
         let placeholderMappings = []; // Store placeholder mappings for Word documents
         let originalWordContent = ''; // Store original Word HTML content
-        let viewMode = 'sample'; // 'sample' or 'placeholder' - for admin viewing
+        let viewMode = 'label'; // 'label' or 'sample' - for admin viewing
         let fontSettings = {
             fontFamily: "'Times New Roman', Times, serif",
             fontSize: 14,
@@ -743,19 +779,38 @@
                 div.className = `placeholder-item ${placeholder.isDefault ? '' : 'custom-placeholder'}`;
                 div.dataset.field = placeholder.field;
                 div.dataset.label = placeholder.label;
+                div.draggable = true;
                 
                 div.innerHTML = `
-                    <i class="${placeholder.icon || 'bi-tag'} me-2"></i>
-                    <span>${placeholder.label}</span>
-                    <small class="d-block text-light opacity-75" style="font-size: 10px;">${placeholder.sampleData || ''}</small>
+                    <div class="d-flex align-items-center">
+                        <i class="${placeholder.icon || 'bi-tag'} me-2"></i>
+                        <div class="flex-grow-1">
+                            <span class="fw-medium">${placeholder.label}</span>
+                            <small class="d-block text-light opacity-75" style="font-size: 10px;">${placeholder.sampleData || ''}</small>
+                        </div>
+                        <span class="placeholder-tag ms-2">${placeholder.field}</span>
+                    </div>
                     ${!placeholder.isDefault ? `<i class="bi bi-x-circle delete-placeholder" onclick="event.stopPropagation(); deleteCustomPlaceholder('${placeholder.field}')"></i>` : ''}
                 `;
                 
-                // Mouse down - start drag
+                // HTML5 Drag events
+                div.addEventListener('dragstart', (e) => {
+                    if (e.target.classList.contains('delete-placeholder')) return;
+                    e.dataTransfer.setData('field', placeholder.field);
+                    e.dataTransfer.setData('label', placeholder.label);
+                    e.dataTransfer.setData('sampleData', placeholder.sampleData || placeholder.label);
+                    e.dataTransfer.effectAllowed = 'copy';
+                    div.classList.add('dragging');
+                });
+                
+                div.addEventListener('dragend', () => {
+                    div.classList.remove('dragging');
+                });
+                
+                // Mouse down - start drag (backup for custom drag ghost)
                 div.addEventListener('mousedown', (e) => {
                     if (e.target.classList.contains('delete-placeholder')) return;
-                    e.preventDefault();
-                    startDragPlaceholder(e, placeholder);
+                    // Let HTML5 drag handle it
                 });
                 
                 container.appendChild(div);
@@ -1110,8 +1165,8 @@
                     contentDiv.innerHTML = currentContract.modifiedContent;
                 }
                 
-                // Enable pointer events for markers after render
-                markersContainer.style.pointerEvents = 'auto';
+                // Enable drop on Word content
+                setupWordDropZone(contentDiv);
                 
                 // Render markers - Word không scale nên dùng scale = 1
                 currentPage = 1;
@@ -1438,9 +1493,88 @@
         }
 
         function createPlaceholderSpan(field, label, sampleData) {
-            // Tạo placeholder giống như marker kéo thả - hiển thị label và sample
-            const displayText = viewMode === 'sample' ? sampleData : `{{${field}}}`;
-            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" onclick="editInlinePlaceholder(this)" title="Click để chỉnh sửa"><span class="placeholder-label">${escapeHtml(label)}</span><br><small style="opacity:0.9">${escapeHtml(displayText)}</small><i class="bi bi-x-circle remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i></span>`;
+            // Tạo placeholder giống n8n - hiển thị label hoặc sample tùy viewMode
+            const displayText = viewMode === 'label' ? label : sampleData;
+            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" onclick="editInlinePlaceholder(this)" title="{{${field}}}">${escapeHtml(displayText)}<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i></span>`;
+        }
+
+        // Setup drop zone for Word content - giống n8n
+        function setupWordDropZone(contentDiv) {
+            // Make content editable for cursor positioning
+            contentDiv.style.cursor = 'text';
+            
+            // Handle click to set cursor position
+            contentDiv.addEventListener('click', function(e) {
+                if (e.target.classList.contains('placeholder-inline') || 
+                    e.target.closest('.placeholder-inline')) {
+                    return;
+                }
+                
+                // Get click position and create range
+                const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                if (range) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    window.lastCaretRange = range.cloneRange();
+                }
+            });
+
+            // Handle dragover
+            contentDiv.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                contentDiv.classList.add('drop-active');
+                
+                // Show drop position indicator
+                const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                if (range) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            });
+
+            // Handle dragleave
+            contentDiv.addEventListener('dragleave', function(e) {
+                contentDiv.classList.remove('drop-active');
+            });
+
+            // Handle drop
+            contentDiv.addEventListener('drop', function(e) {
+                e.preventDefault();
+                contentDiv.classList.remove('drop-active');
+                
+                // Get dropped placeholder data
+                const field = e.dataTransfer.getData('field');
+                const label = e.dataTransfer.getData('label');
+                const sampleData = e.dataTransfer.getData('sampleData');
+                
+                if (!field) return;
+                
+                // Create placeholder element
+                const placeholder = document.createElement('span');
+                placeholder.className = 'placeholder-inline';
+                placeholder.dataset.field = field;
+                placeholder.dataset.label = label;
+                placeholder.dataset.sample = sampleData;
+                placeholder.title = `{{${field}}}`;
+                placeholder.onclick = function() { editInlinePlaceholder(this); };
+                
+                const displayText = viewMode === 'label' ? label : sampleData;
+                placeholder.innerHTML = `${escapeHtml(displayText)}<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i>`;
+                
+                // Insert at drop position
+                const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                if (range) {
+                    range.insertNode(placeholder);
+                    // Move cursor after placeholder
+                    range.setStartAfter(placeholder);
+                    range.collapse(true);
+                }
+                
+                showToast('Đã thêm', `Đã chèn "${label}"`, 'success');
+            });
         }
 
         function editInlinePlaceholder(span) {
@@ -1543,19 +1677,28 @@
             
             // Update button states
             document.getElementById('btnViewSample').classList.toggle('active', mode === 'sample');
-            document.getElementById('btnViewPlaceholder').classList.toggle('active', mode === 'placeholder');
+            document.getElementById('btnViewLabel').classList.toggle('active', mode === 'label');
             
-            // Update all placeholder spans
+            // Update all placeholder spans - hiển thị label hoặc sample
             const placeholderSpans = document.querySelectorAll('.placeholder-inline');
             placeholderSpans.forEach(span => {
-                const field = span.dataset.field;
+                const label = span.dataset.label;
                 const sample = span.dataset.sample;
-                const displayText = mode === 'sample' ? sample : `{{${field}}}`;
+                const displayText = mode === 'sample' ? sample : label;
                 
-                // Update the small element
-                const smallEl = span.querySelector('small');
-                if (smallEl) {
-                    smallEl.textContent = displayText;
+                // Update text content (giữ lại icon x)
+                const removeIcon = span.querySelector('.remove-placeholder-inline');
+                span.textContent = displayText;
+                if (removeIcon) {
+                    span.appendChild(removeIcon);
+                } else {
+                    const icon = document.createElement('i');
+                    icon.className = 'bi bi-x remove-placeholder-inline';
+                    icon.onclick = function(e) {
+                        e.stopPropagation();
+                        removeInlinePlaceholder(this);
+                    };
+                    span.appendChild(icon);
                 }
             });
         }
