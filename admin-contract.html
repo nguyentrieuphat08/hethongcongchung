@@ -140,30 +140,60 @@
         .placeholder-inline {
             display: inline-flex;
             align-items: center;
-            background-color: #ff6d5a;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 0 6px;
-            border-radius: 3px;
+            padding: 0 8px;
+            border-radius: 4px;
             font-size: 12px;
             font-weight: 500;
-            cursor: pointer;
+            cursor: grab;
             white-space: nowrap;
-            height: 20px;
-            line-height: 20px;
+            height: 22px;
+            line-height: 22px;
             vertical-align: middle;
-            margin: 0 1px;
+            margin: 0 2px;
+            user-select: none;
+            transition: all 0.2s;
         }
         .placeholder-inline:hover {
-            background-color: #e55a4a;
+            background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        .placeholder-inline:active {
+            cursor: grabbing;
+        }
+        .placeholder-inline.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
         }
         .placeholder-inline .remove-placeholder-inline {
-            margin-left: 4px;
+            margin-left: 6px;
             cursor: pointer;
             opacity: 0.7;
-            font-size: 10px;
+            font-size: 11px;
         }
         .placeholder-inline .remove-placeholder-inline:hover {
             opacity: 1;
+        }
+        /* Chế độ xem mẫu - hiển thị text thuần không viền */
+        .placeholder-inline.sample-view {
+            background: transparent;
+            color: #333;
+            padding: 0;
+            border-radius: 0;
+            font-weight: normal;
+            cursor: default;
+            height: auto;
+            line-height: inherit;
+            margin: 0;
+            box-shadow: none;
+        }
+        .placeholder-inline.sample-view:hover {
+            background: transparent;
+            box-shadow: none;
+        }
+        .placeholder-inline.sample-view .remove-placeholder-inline {
+            display: none;
         }
         /* Drop zone highlight */
         .word-content {
@@ -177,7 +207,7 @@
             display: inline-block;
             width: 2px;
             height: 1em;
-            background-color: #ff6d5a;
+            background-color: #667eea;
             animation: blink 1s infinite;
             vertical-align: middle;
         }
@@ -1483,19 +1513,25 @@
             // Replace dots with placeholder spans in the HTML
             replaceDotsWithPlaceholders(wordContent, suggestions);
 
+            // Setup drag for newly inserted placeholders
+            setupExistingPlaceholdersDrag(wordContent);
+
             // Save
             saveCustomPlaceholders();
             savePlaceholderMappings();
             renderPlaceholders();
             
             const insertedCount = document.querySelectorAll('.placeholder-inline').length;
-            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder. Click vào placeholder để chỉnh sửa.`, 'success');
+            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder. Kéo thả để di chuyển, click để chỉnh sửa.`, 'success');
         }
 
         function createPlaceholderSpan(field, label, sampleData) {
             // Tạo placeholder giống n8n - hiển thị label hoặc sample tùy viewMode
             const displayText = viewMode === 'label' ? label : sampleData;
-            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" onclick="editInlinePlaceholder(this)" title="{{${field}}}">${escapeHtml(displayText)}<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i></span>`;
+            const sampleClass = viewMode === 'sample' ? ' sample-view' : '';
+            const draggableAttr = viewMode === 'label' ? 'draggable="true"' : '';
+            const removeIcon = viewMode === 'label' ? `<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i>` : '';
+            return `<span class="placeholder-inline${sampleClass}" ${draggableAttr} data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" onclick="editInlinePlaceholder(this)" title="{{${field}}}">${escapeHtml(displayText)}${removeIcon}</span>`;
         }
 
         // Setup drop zone for Word content - giống n8n
@@ -1523,7 +1559,7 @@
             // Handle dragover
             contentDiv.addEventListener('dragover', function(e) {
                 e.preventDefault();
-                e.dataTransfer.dropEffect = 'copy';
+                e.dataTransfer.dropEffect = 'move';
                 contentDiv.classList.add('drop-active');
                 
                 // Show drop position indicator
@@ -1540,7 +1576,7 @@
                 contentDiv.classList.remove('drop-active');
             });
 
-            // Handle drop
+            // Handle drop - hỗ trợ cả thêm mới và di chuyển placeholder
             contentDiv.addEventListener('drop', function(e) {
                 e.preventDefault();
                 contentDiv.classList.remove('drop-active');
@@ -1549,31 +1585,85 @@
                 const field = e.dataTransfer.getData('field');
                 const label = e.dataTransfer.getData('label');
                 const sampleData = e.dataTransfer.getData('sampleData');
+                const isMoving = e.dataTransfer.getData('isMoving') === 'true';
                 
                 if (!field) return;
                 
-                // Create placeholder element
+                // Get drop position
+                const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+                if (!range) return;
+                
+                // If moving existing placeholder, remove it first
+                if (isMoving) {
+                    const existingPlaceholder = contentDiv.querySelector(`.placeholder-inline[data-moving="true"]`);
+                    if (existingPlaceholder) {
+                        existingPlaceholder.remove();
+                    }
+                }
+                
+                // Create new placeholder element
                 const placeholder = document.createElement('span');
-                placeholder.className = 'placeholder-inline';
+                placeholder.className = viewMode === 'sample' ? 'placeholder-inline sample-view' : 'placeholder-inline';
                 placeholder.dataset.field = field;
                 placeholder.dataset.label = label;
                 placeholder.dataset.sample = sampleData;
                 placeholder.title = `{{${field}}}`;
+                placeholder.draggable = viewMode === 'label';
                 placeholder.onclick = function() { editInlinePlaceholder(this); };
                 
                 const displayText = viewMode === 'label' ? label : sampleData;
-                placeholder.innerHTML = `${escapeHtml(displayText)}<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i>`;
-                
-                // Insert at drop position
-                const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-                if (range) {
-                    range.insertNode(placeholder);
-                    // Move cursor after placeholder
-                    range.setStartAfter(placeholder);
-                    range.collapse(true);
+                if (viewMode === 'label') {
+                    placeholder.innerHTML = `${escapeHtml(displayText)}<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i>`;
+                } else {
+                    placeholder.textContent = displayText;
                 }
                 
+                // Setup drag for new placeholder
+                setupPlaceholderDrag(placeholder);
+                
+                // Insert at drop position
+                range.insertNode(placeholder);
+                
+                // Move cursor after placeholder
+                range.setStartAfter(placeholder);
+                range.collapse(true);
+                
                 showToast('Đã thêm', `Đã chèn "${label}"`, 'success');
+            });
+            
+            // Setup drag for existing placeholders
+            setupExistingPlaceholdersDrag(contentDiv);
+        }
+        
+        // Setup drag cho một placeholder
+        function setupPlaceholderDrag(placeholder) {
+            placeholder.addEventListener('dragstart', function(e) {
+                if (viewMode !== 'label') {
+                    e.preventDefault();
+                    return;
+                }
+                
+                e.dataTransfer.setData('field', this.dataset.field);
+                e.dataTransfer.setData('label', this.dataset.label);
+                e.dataTransfer.setData('sampleData', this.dataset.sample);
+                e.dataTransfer.setData('isMoving', 'true');
+                e.dataTransfer.effectAllowed = 'move';
+                
+                this.classList.add('dragging');
+                this.dataset.moving = 'true';
+            });
+            
+            placeholder.addEventListener('dragend', function() {
+                this.classList.remove('dragging');
+                delete this.dataset.moving;
+            });
+        }
+        
+        // Setup drag cho tất cả placeholders hiện có trong content
+        function setupExistingPlaceholdersDrag(contentDiv) {
+            const placeholders = contentDiv.querySelectorAll('.placeholder-inline');
+            placeholders.forEach(placeholder => {
+                setupPlaceholderDrag(placeholder);
             });
         }
 
@@ -1686,12 +1776,16 @@
                 const sample = span.dataset.sample;
                 const displayText = mode === 'sample' ? sample : label;
                 
-                // Update text content (giữ lại icon x)
-                const removeIcon = span.querySelector('.remove-placeholder-inline');
-                span.textContent = displayText;
-                if (removeIcon) {
-                    span.appendChild(removeIcon);
+                // Toggle sample-view class để hiển thị text thuần hoặc tag
+                if (mode === 'sample') {
+                    span.classList.add('sample-view');
+                    span.textContent = displayText;
+                    span.draggable = false;
                 } else {
+                    span.classList.remove('sample-view');
+                    span.textContent = displayText;
+                    span.draggable = true;
+                    // Thêm lại icon x
                     const icon = document.createElement('i');
                     icon.className = 'bi bi-x remove-placeholder-inline';
                     icon.onclick = function(e) {
@@ -1820,39 +1914,78 @@
         }
 
         async function callGeminiAPI(documentText) {
-            const prompt = `Bạn là chuyên gia phân tích hợp đồng/văn bản pháp lý Việt Nam.
+            const prompt = `Bạn là chuyên gia phân tích hợp đồng/văn bản pháp lý Việt Nam. Nhiệm vụ: tìm CHÍNH XÁC các vị trí cần điền thông tin.
 
-Phân tích nội dung hợp đồng sau và tìm các vị trí cần điền thông tin (các chỗ có dấu "...", "…", "___" hoặc khoảng trống cần điền).
+NGUYÊN TẮC QUAN TRỌNG:
+1. Phân tích NGỮ CẢNH xung quanh để xác định ĐÚNG loại thông tin cần điền
+2. Ví dụ: "Ngày...tháng...năm" → điền ngày/tháng/năm, KHÔNG phải họ tên hay số CCCD
+3. "Ông/Bà:..." hoặc "Họ và tên:..." → điền họ tên
+4. "Số CCCD/CMND:..." → điền số CCCD
+5. "Sinh ngày:..." → điền ngày sinh
+6. "Địa chỉ:..." → điền địa chỉ
+7. "Số tiền:...đồng" hoặc "...VNĐ" → điền số tiền
+8. Nếu có "Bên A", "Bên B", "Bên thuê", "Bên cho thuê" → đánh số rõ ràng
 
 Hợp đồng:
 """
-${documentText.substring(0, 12000)}
+${documentText.substring(0, 15000)}
 """
 
 Yêu cầu:
-1. Tìm TẤT CẢ các vị trí có dấu "...", "…", "___" hoặc khoảng trống cần điền thông tin
-2. Xác định loại thông tin cần điền: họ tên, ngày sinh, số CCCD/CMND, địa chỉ, số điện thoại, email, ngày tháng, số tiền, tên công ty, mã số thuế, chức vụ, v.v.
-3. "contextBefore" là từ/cụm từ NGAY TRƯỚC chỗ cần điền (để xác định vị trí)
-4. Nếu có nhiều bên (bên A, bên B), đánh số để phân biệt
+1. Tìm TẤT CẢ vị trí có dấu "...", "…", "___" hoặc chỗ trống cần điền
+2. Đọc KỸ từ/cụm từ TRƯỚC chỗ điền để xác định loại thông tin CHÍNH XÁC
+3. Phân biệt rõ các loại:
+   - HỌ TÊN: sau "Ông/Bà:", "Họ và tên:", "Tên:"
+   - NGÀY THÁNG: sau "ngày", "tháng", "năm", "Ngày ký:"
+   - NGÀY SINH: sau "sinh ngày", "ngày sinh"
+   - SỐ CCCD: sau "CCCD số:", "CMND số:", "Số CCCD:"
+   - ĐỊA CHỈ: sau "Địa chỉ:", "thường trú:", "ĐKTT:", "tại:"
+   - SỐ TIỀN: sau "Số tiền:", "giá:", trước "đồng", "VNĐ"
+   - SỐ ĐIỆN THOẠI: sau "SĐT:", "Điện thoại:"
+   - NGÀY CẤP: sau "cấp ngày:", "ngày cấp:"
+   - NƠI CẤP: sau "cấp tại:", "nơi cấp:", "do...cấp"
 
-Trả về JSON array với format:
+4. contextBefore: từ/cụm từ NGAY TRƯỚC chỗ cần điền (5-20 ký tự)
+5. Đánh số: fullname_ben_a, fullname_ben_b, address_ben_a, v.v.
+
+Trả về JSON array:
 [
   {
-    "contextBefore": "từ/cụm từ ngay trước chỗ điền",
-    "field": "ten_bien_khong_dau",
-    "label": "Tên hiển thị tiếng Việt",
-    "sampleData": "Dữ liệu mẫu thực tế"
+    "contextBefore": "Ông/Bà:",
+    "field": "fullname_ben_a",
+    "label": "Họ tên bên A",
+    "sampleData": "Nguyễn Văn A"
+  },
+  {
+    "contextBefore": "CCCD số:",
+    "field": "cccd_ben_a",
+    "label": "Số CCCD bên A",
+    "sampleData": "001234567890"
+  },
+  {
+    "contextBefore": "Ngày",
+    "field": "ngay_ky",
+    "label": "Ngày ký",
+    "sampleData": "15"
+  },
+  {
+    "contextBefore": "tháng",
+    "field": "thang_ky",
+    "label": "Tháng ký",
+    "sampleData": "06"
+  },
+  {
+    "contextBefore": "năm",
+    "field": "nam_ky",
+    "label": "Năm ký",
+    "sampleData": "2024"
   }
 ]
 
-Ví dụ hợp đồng có: "Ông/Bà: ........................ sinh ngày ....../....../......"
-Kết quả:
-[
-  {"contextBefore": "Ông/Bà:", "field": "fullname_1", "label": "Họ tên", "sampleData": "Nguyễn Văn A"},
-  {"contextBefore": "sinh ngày", "field": "birthday_day", "label": "Ngày sinh", "sampleData": "15"},
-  {"contextBefore": "/", "field": "birthday_month", "label": "Tháng sinh", "sampleData": "06"},
-  {"contextBefore": "/", "field": "birthday_year", "label": "Năm sinh", "sampleData": "1990"}
-]
+CHÚ Ý: 
+- Mỗi chỗ "..." là một placeholder RIÊNG
+- KHÔNG nhầm lẫn giữa các loại thông tin
+- Dữ liệu mẫu phải PHÙ HỢP với loại thông tin (ngày thì là số ngày, tên thì là tên người...)
 
 Chỉ trả về JSON array, không có text khác.`;
 
