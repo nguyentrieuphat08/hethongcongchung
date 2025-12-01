@@ -1559,7 +1559,8 @@
             // Handle dragover
             contentDiv.addEventListener('dragover', function(e) {
                 e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
+                // Cho phép cả copy (từ sidebar) và move (di chuyển trong content)
+                e.dataTransfer.dropEffect = 'copy';
                 contentDiv.classList.add('drop-active');
                 
                 // Show drop position indicator
@@ -1647,7 +1648,7 @@
                 e.dataTransfer.setData('label', this.dataset.label);
                 e.dataTransfer.setData('sampleData', this.dataset.sample);
                 e.dataTransfer.setData('isMoving', 'true');
-                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.effectAllowed = 'copyMove';
                 
                 this.classList.add('dragging');
                 this.dataset.moving = 'true';
