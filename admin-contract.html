@@ -1853,20 +1853,34 @@
                 if (contextBefore.length >= 2) {
                     // Escape special regex characters
                     const escapedContext = contextBefore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    // Match context followed by dots/underscores/ellipsis
-                    const regex = new RegExp(`(${escapedContext}[:\\s]*)([\.…_]{2,}|\\.\\.+)`, 'gi');
                     
-                    html = html.replace(regex, (match, prefix, dots) => {
+                    // Pattern 1: context followed by dots/underscores
+                    const regexWithDots = new RegExp(`(${escapedContext}[:\\s]*)([\.…_]{2,}|\\.\\.+)`, 'gi');
+                    
+                    html = html.replace(regexWithDots, (match, prefix, dots) => {
                         if (usedSuggestions.has(suggestion.field)) return match;
                         
                         usedSuggestions.add(suggestion.field);
                         return `${prefix}${createPlaceholderSpan(suggestion.field, suggestion.label, suggestion.sampleData)}`;
                     });
+                    
+                    // Pattern 2: context ending with ":" followed by whitespace/newline (no dots)
+                    // Only if hasDotsInOriginal is false
+                    if (!usedSuggestions.has(suggestion.field) && suggestion.hasDotsInOriginal === false) {
+                        const regexNoDots = new RegExp(`(${escapedContext})([:\\s]*)(?=\\s*<|\\s*$|\\s{2,})`, 'gi');
+                        
+                        html = html.replace(regexNoDots, (match, label, separator) => {
+                            if (usedSuggestions.has(suggestion.field)) return match;
+                            
+                            usedSuggestions.add(suggestion.field);
+                            return `${label}${separator}${createPlaceholderSpan(suggestion.field, suggestion.label, suggestion.sampleData)}`;
+                        });
+                    }
                 }
             });
             
-            // Second pass: Pattern-based matching for common fields
-            const patterns = [
+            // Second pass: Pattern-based matching for common fields WITH dots
+            const patternsWithDots = [
                 { regex: /(Ông|Bà|Họ và tên|Họ tên)[:\s]*([\.…_]{2,})/gi, type: 'fullname' },
                 { regex: /(Địa chỉ[^:]*|Thường trú|Nơi ở|tại địa chỉ)[:\s]*([\.…_]{2,})/gi, type: 'address' },
                 { regex: /(CCCD|CMND|Căn cước|số CCCD|số CMND)[:\s]*([\.…_]{2,})/gi, type: 'idcard' },
@@ -1877,7 +1891,7 @@
                 { regex: /(cấp ngày|Ngày cấp)[:\s]*([\.…_]{2,})/gi, type: 'issue_date' },
             ];
 
-            patterns.forEach(({ regex, type }) => {
+            patternsWithDots.forEach(({ regex, type }) => {
                 html = html.replace(regex, (match, prefix, dots) => {
                     // Find matching suggestion that hasn't been used
                     const suggestion = suggestions.find(s => 
@@ -1894,8 +1908,35 @@
                     return match;
                 });
             });
+            
+            // Third pass: Pattern-based matching for fields WITHOUT dots (just "Label:" format)
+            const patternsNoDots = [
+                { regex: /(Ông|Bà|Họ và tên|Họ tên)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'fullname' },
+                { regex: /(Địa chỉ|Thường trú|Nơi ở)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'address' },
+                { regex: /(CCCD|CMND|Căn cước|Số CCCD|Số CMND)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'idcard' },
+                { regex: /(Điện thoại|Số ĐT|SĐT)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'phone' },
+                { regex: /(Ngày sinh|Sinh ngày)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'birthday' },
+                { regex: /(Email|E-mail)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'email' },
+            ];
+            
+            patternsNoDots.forEach(({ regex, type }) => {
+                html = html.replace(regex, (match, prefix, separator) => {
+                    const suggestion = suggestions.find(s => 
+                        !usedSuggestions.has(s.field) && 
+                        (s.field.toLowerCase().includes(type) || 
+                         s.label.toLowerCase().includes(type) ||
+                         type.includes(s.field.toLowerCase()))
+                    );
+                    
+                    if (suggestion) {
+                        usedSuggestions.add(suggestion.field);
+                        return `${prefix}${separator}${createPlaceholderSpan(suggestion.field, suggestion.label, suggestion.sampleData)}`;
+                    }
+                    return match;
+                });
+            });
 
-            // Third pass: Replace remaining dots with unused suggestions
+            // Fourth pass: Replace remaining dots with unused suggestions
             const remainingSuggestions = suggestions.filter(s => !usedSuggestions.has(s.field));
             let suggestionIndex = 0;
             
@@ -1948,13 +1989,27 @@
 
 NGUYÊN TẮC QUAN TRỌNG:
 1. Phân tích NGỮ CẢNH xung quanh để xác định ĐÚNG loại thông tin cần điền
-2. Ví dụ: "Ngày...tháng...năm" → điền ngày/tháng/năm, KHÔNG phải họ tên hay số CCCD
-3. "Ông/Bà:..." hoặc "Họ và tên:..." → điền họ tên
-4. "Số CCCD/CMND:..." → điền số CCCD
-5. "Sinh ngày:..." → điền ngày sinh
-6. "Địa chỉ:..." → điền địa chỉ
-7. "Số tiền:...đồng" hoặc "...VNĐ" → điền số tiền
-8. Nếu có "Bên A", "Bên B", "Bên thuê", "Bên cho thuê" → đánh số rõ ràng
+2. Có 2 DẠNG vị trí cần điền:
+   - DẠNG 1: Có dấu "...", "…", "___" (ví dụ: "Họ và tên: ............")
+   - DẠNG 2: Chỉ có label + dấu ":" rồi xuống dòng hoặc khoảng trắng (ví dụ: "Họ và tên:" hoặc "Họ và tên: ")
+3. Cả 2 dạng đều cần được nhận diện và tạo placeholder
+
+VÍ DỤ:
+- "Họ và tên: " (không có dấu chấm) → vẫn cần placeholder cho họ tên
+- "Địa chỉ:" (không có dấu chấm) → vẫn cần placeholder cho địa chỉ
+- "CCCD số:" → vẫn cần placeholder cho số CCCD
+
+PHÂN BIỆT LOẠI THÔNG TIN:
+- HỌ TÊN: sau "Ông/Bà:", "Họ và tên:", "Tên:", "Ông:", "Bà:"
+- NGÀY THÁNG KÝ: sau "ngày", "tháng", "năm" (trong ngữ cảnh ký hợp đồng)
+- NGÀY SINH: sau "sinh ngày", "ngày sinh", "Sinh năm"
+- SỐ CCCD/CMND: sau "CCCD:", "CMND:", "Số CCCD:", "Căn cước:"
+- ĐỊA CHỈ: sau "Địa chỉ:", "thường trú:", "ĐKTT:", "Nơi ở:", "tại:"
+- SỐ TIỀN: sau "Số tiền:", "Giá:", trước "đồng", "VNĐ"
+- SỐ ĐIỆN THOẠI: sau "SĐT:", "Điện thoại:", "Phone:"
+- NGÀY CẤP: sau "cấp ngày:", "ngày cấp:"
+- NƠI CẤP: sau "cấp tại:", "nơi cấp:", "do...cấp"
+- Nếu có "Bên A", "Bên B", "Bên thuê", "Bên cho thuê" → đánh số rõ ràng
 
 Hợp đồng:
 """
@@ -1962,60 +2017,33 @@ ${documentText.substring(0, 15000)}
 """
 
 Yêu cầu:
-1. Tìm TẤT CẢ vị trí có dấu "...", "…", "___" hoặc chỗ trống cần điền
-2. Đọc KỸ từ/cụm từ TRƯỚC chỗ điền để xác định loại thông tin CHÍNH XÁC
-3. Phân biệt rõ các loại:
-   - HỌ TÊN: sau "Ông/Bà:", "Họ và tên:", "Tên:"
-   - NGÀY THÁNG: sau "ngày", "tháng", "năm", "Ngày ký:"
-   - NGÀY SINH: sau "sinh ngày", "ngày sinh"
-   - SỐ CCCD: sau "CCCD số:", "CMND số:", "Số CCCD:"
-   - ĐỊA CHỈ: sau "Địa chỉ:", "thường trú:", "ĐKTT:", "tại:"
-   - SỐ TIỀN: sau "Số tiền:", "giá:", trước "đồng", "VNĐ"
-   - SỐ ĐIỆN THOẠI: sau "SĐT:", "Điện thoại:"
-   - NGÀY CẤP: sau "cấp ngày:", "ngày cấp:"
-   - NƠI CẤP: sau "cấp tại:", "nơi cấp:", "do...cấp"
-
-4. contextBefore: từ/cụm từ NGAY TRƯỚC chỗ cần điền (5-20 ký tự)
-5. Đánh số: fullname_ben_a, fullname_ben_b, address_ben_a, v.v.
+1. Tìm TẤT CẢ vị trí cần điền, KỂ CẢ những chỗ KHÔNG có dấu "..."
+2. Nếu thấy "Label:" mà sau đó trống hoặc xuống dòng → đó là vị trí cần điền
+3. contextBefore: từ/cụm từ NGAY TRƯỚC chỗ cần điền (bao gồm dấu ":")
+4. Đánh số theo bên: fullname_ben_a, fullname_ben_b, address_ben_a, v.v.
 
 Trả về JSON array:
 [
   {
-    "contextBefore": "Ông/Bà:",
+    "contextBefore": "Họ và tên:",
     "field": "fullname_ben_a",
     "label": "Họ tên bên A",
-    "sampleData": "Nguyễn Văn A"
+    "sampleData": "Nguyễn Văn A",
+    "hasDotsInOriginal": false
   },
   {
     "contextBefore": "CCCD số:",
-    "field": "cccd_ben_a",
+    "field": "cccd_ben_a", 
     "label": "Số CCCD bên A",
-    "sampleData": "001234567890"
-  },
-  {
-    "contextBefore": "Ngày",
-    "field": "ngay_ky",
-    "label": "Ngày ký",
-    "sampleData": "15"
-  },
-  {
-    "contextBefore": "tháng",
-    "field": "thang_ky",
-    "label": "Tháng ký",
-    "sampleData": "06"
-  },
-  {
-    "contextBefore": "năm",
-    "field": "nam_ky",
-    "label": "Năm ký",
-    "sampleData": "2024"
+    "sampleData": "001234567890",
+    "hasDotsInOriginal": true
   }
 ]
 
 CHÚ Ý: 
-- Mỗi chỗ "..." là một placeholder RIÊNG
-- KHÔNG nhầm lẫn giữa các loại thông tin
-- Dữ liệu mẫu phải PHÙ HỢP với loại thông tin (ngày thì là số ngày, tên thì là tên người...)
+- hasDotsInOriginal: true nếu có dấu "...", false nếu chỉ có label + ":"
+- Dữ liệu mẫu phải PHÙ HỢP với loại thông tin
+- KHÔNG bỏ sót các vị trí chỉ có "Label:" mà không có dấu chấm
 
 Chỉ trả về JSON array, không có text khác.`;
 
