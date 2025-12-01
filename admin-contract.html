@@ -117,6 +117,31 @@
         .field-marker .remove-marker:hover {
             opacity: 1;
         }
+        /* Inline placeholder styles - giống marker nhưng inline trong text */
+        .placeholder-inline {
+            display: inline;
+            background-color: transparent;
+            color: inherit;
+            padding: 0 2px;
+            border: none;
+            cursor: default;
+            white-space: nowrap;
+            position: relative;
+        }
+        .placeholder-inline:hover {
+            background-color: rgba(102, 126, 234, 0.15);
+            border-radius: 2px;
+        }
+        .placeholder-inline .remove-placeholder-inline {
+            display: none;
+            margin-left: 4px;
+            cursor: pointer;
+            color: #dc3545;
+            font-size: 10px;
+        }
+        .placeholder-inline:hover .remove-placeholder-inline {
+            display: inline;
+        }
         .add-placeholder-form {
             background-color: #f8f9fa;
             border-radius: 8px;
@@ -307,19 +332,11 @@
                                     <i class="bi bi-save me-2"></i>Lưu cấu hình
                                 </button>
                                 <button class="btn btn-warning w-100 mt-2" onclick="clearAllMarkers()" id="clearMarkersBtn" disabled>
-                                    <i class="bi bi-eraser me-2"></i>Xóa tất cả marker
+                                    <i class="bi bi-eraser me-2"></i>Xóa tất cả placeholder
                                 </button>
                                 <button class="btn btn-info w-100 mt-2" onclick="autoDetectPlaceholders()" id="aiDetectBtn" disabled>
                                     <i class="bi bi-robot me-2"></i>AI tự động chèn placeholder
                                 </button>
-                                <div class="btn-group w-100 mt-2" role="group">
-                                    <button class="btn btn-outline-secondary" onclick="toggleDisplayMode('placeholder')" id="btnShowPlaceholder">
-                                        <i class="bi bi-code me-1"></i>{{field}}
-                                    </button>
-                                    <button class="btn btn-outline-secondary active" onclick="toggleDisplayMode('sample')" id="btnShowSample">
-                                        <i class="bi bi-eye me-1"></i>Mẫu
-                                    </button>
-                                </div>
                                 <button class="btn btn-outline-danger w-100 mt-2" onclick="clearCustomPlaceholders()">
                                     <i class="bi bi-trash me-2"></i>Xóa placeholder tùy chỉnh
                                 </button>
@@ -414,7 +431,6 @@
         let totalPages = 1;
         let markers = [];
         let placeholderMappings = []; // Store placeholder mappings for Word documents
-        let displayMode = 'sample'; // 'sample' or 'placeholder'
         let originalWordContent = ''; // Store original Word HTML content
         let fontSettings = {
             fontFamily: "'Times New Roman', Times, serif",
@@ -1368,7 +1384,22 @@
             renderPlaceholders();
             
             const insertedCount = document.querySelectorAll('.placeholder-inline').length;
-            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder vào hợp đồng. Chuyển đổi giữa chế độ {{field}} và Mẫu để xem.`, 'success');
+            showToast('Thành công', `AI đã chèn ${insertedCount} placeholder vào hợp đồng. Di chuột vào placeholder để xóa.`, 'success');
+        }
+
+        function createPlaceholderSpan(field, label, sampleData) {
+            // Tạo placeholder hiển thị dữ liệu mẫu, có nút xóa khi hover
+            return `<span class="placeholder-inline" data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" title="${escapeHtml(label)}">${escapeHtml(sampleData)}<i class="bi bi-x-circle remove-placeholder-inline" onclick="removeInlinePlaceholder(this)"></i></span>`;
+        }
+
+        function removeInlinePlaceholder(element) {
+            const span = element.parentElement;
+            if (span && span.classList.contains('placeholder-inline')) {
+                // Thay placeholder bằng dấu ... để có thể chèn lại
+                const textNode = document.createTextNode('...........');
+                span.parentNode.replaceChild(textNode, span);
+                showToast('Đã xóa', 'Placeholder đã được xóa', 'success');
+            }
         }
 
         function replaceDotsWithPlaceholders(container, suggestions) {
@@ -1393,8 +1424,7 @@
                         if (usedSuggestions.has(suggestion.field)) return match;
                         
                         usedSuggestions.add(suggestion.field);
-                        const displayValue = displayMode === 'sample' ? suggestion.sampleData : `{{${suggestion.field}}}`;
-                        return `${prefix}<span class="placeholder-inline" data-field="${suggestion.field}" data-label="${escapeHtml(suggestion.label)}" data-sample="${escapeHtml(suggestion.sampleData)}" style="background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; border: 1px dashed #ffc107; color: #856404; font-weight: 500;">${displayValue}</span>`;
+                        return `${prefix}${createPlaceholderSpan(suggestion.field, suggestion.label, suggestion.sampleData)}`;
                     });
                 }
             });
@@ -1423,8 +1453,7 @@
                     
                     if (suggestion) {
                         usedSuggestions.add(suggestion.field);
-                        const displayValue = displayMode === 'sample' ? suggestion.sampleData : `{{${suggestion.field}}}`;
-                        return `${prefix} <span class="placeholder-inline" data-field="${suggestion.field}" data-label="${escapeHtml(suggestion.label)}" data-sample="${escapeHtml(suggestion.sampleData)}" style="background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; border: 1px dashed #ffc107; color: #856404; font-weight: 500;">${displayValue}</span>`;
+                        return `${prefix} ${createPlaceholderSpan(suggestion.field, suggestion.label, suggestion.sampleData)}`;
                     }
                     return match;
                 });
@@ -1440,8 +1469,7 @@
                 if (suggestionIndex < remainingSuggestions.length) {
                     const suggestion = remainingSuggestions[suggestionIndex++];
                     usedSuggestions.add(suggestion.field);
-                    const displayValue = displayMode === 'sample' ? suggestion.sampleData : `{{${suggestion.field}}}`;
-                    return `<span class="placeholder-inline" data-field="${suggestion.field}" data-label="${escapeHtml(suggestion.label)}" data-sample="${escapeHtml(suggestion.sampleData)}" style="background-color: #fff3cd; padding: 2px 6px; border-radius: 3px; border: 1px dashed #ffc107; color: #856404; font-weight: 500;">${displayValue}</span>`;
+                    return createPlaceholderSpan(suggestion.field, suggestion.label, suggestion.sampleData);
                 }
                 return match;
             });
@@ -1449,33 +1477,6 @@
             container.innerHTML = html;
             
             console.log(`Replaced ${usedSuggestions.size}/${suggestions.length} placeholders`);
-        }
-
-        function toggleDisplayMode(mode) {
-            displayMode = mode;
-            
-            // Update button states
-            document.getElementById('btnShowPlaceholder').classList.toggle('active', mode === 'placeholder');
-            document.getElementById('btnShowSample').classList.toggle('active', mode === 'sample');
-            
-            // Update all placeholder spans
-            const placeholderSpans = document.querySelectorAll('.placeholder-inline');
-            placeholderSpans.forEach(span => {
-                const field = span.dataset.field;
-                const sample = span.dataset.sample;
-                
-                if (mode === 'placeholder') {
-                    span.textContent = `{{${field}}}`;
-                    span.style.backgroundColor = '#e7f3ff';
-                    span.style.borderColor = '#0d6efd';
-                    span.style.color = '#0a58ca';
-                } else {
-                    span.textContent = sample;
-                    span.style.backgroundColor = '#fff3cd';
-                    span.style.borderColor = '#ffc107';
-                    span.style.color = '#856404';
-                }
-            });
         }
 
         function savePlaceholderMappings() {
