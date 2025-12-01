@@ -1489,6 +1489,7 @@
             });
 
             // Replace dots with placeholder spans in the HTML
+            // Truyền suggestions (có thể rỗng) - hàm sẽ tự detect patterns
             replaceDotsWithPlaceholders(wordContent, suggestions);
 
             // Setup drag for newly inserted placeholders
@@ -1938,31 +1939,62 @@
             });
             
             // Third pass: Pattern-based matching for fields WITHOUT dots (just "Label:" format)
+            // Match "Label:" followed by whitespace, HTML tags, or end of content
             const patternsNoDots = [
-                { regex: /(Ông|Bà|Họ và tên|Họ tên)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'fullname' },
-                { regex: /(Địa chỉ|Thường trú|Nơi ở)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'address' },
-                { regex: /(CCCD|CMND|Căn cước|Số CCCD|Số CMND)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'idcard' },
-                { regex: /(Điện thoại|Số ĐT|SĐT)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'phone' },
-                { regex: /(Ngày sinh|Sinh ngày)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'birthday' },
-                { regex: /(Email|E-mail)(\s*:\s*)(?=\s*<br|<\/p|<\/div|\s*$)/gi, type: 'email' },
+                { regex: /(Họ và tên|Họ tên)(\s*:\s*)(?![^\s<])/gi, type: 'fullname' },
+                { regex: /(Địa chỉ|Thường trú|Nơi ở|Nơi ĐKTT)(\s*:\s*)(?![^\s<])/gi, type: 'address' },
+                { regex: /(CCCD|CMND|Căn cước)(\s*:\s*)(?![^\s<])/gi, type: 'idcard' },
+                { regex: /(Điện thoại|Số điện thoại|SĐT)(\s*:\s*)(?![^\s<])/gi, type: 'phone' },
+                { regex: /(Ngày sinh|Sinh ngày)(\s*:\s*)(?![^\s<])/gi, type: 'birthday' },
+                { regex: /(Email|E-mail)(\s*:\s*)(?![^\s<])/gi, type: 'email' },
+                { regex: /(Chức vụ)(\s*:\s*)(?![^\s<])/gi, type: 'position' },
+                { regex: /(Ngày cấp|Cấp ngày)(\s*:\s*)(?![^\s<])/gi, type: 'issue_date' },
+                { regex: /(Nơi cấp|Cấp tại)(\s*:\s*)(?![^\s<])/gi, type: 'issue_place' },
             ];
             
             patternsNoDots.forEach(({ regex, type }) => {
                 html = html.replace(regex, (match, prefix, separator) => {
-                    const suggestion = suggestions.find(s => 
+                    // Tìm suggestion phù hợp
+                    let suggestion = suggestions.find(s => 
                         !usedSuggestions.has(s.field) && 
                         (s.field.toLowerCase().includes(type) || 
                          s.label.toLowerCase().includes(type) ||
                          type.includes(s.field.toLowerCase()))
                     );
                     
-                    if (suggestion) {
+                    // Nếu không tìm thấy, tạo placeholder mới
+                    if (!suggestion) {
+                        const fieldName = `${type}_${Date.now()}`;
+                        suggestion = {
+                            field: fieldName,
+                            label: prefix,
+                            sampleData: getSampleDataForType(type)
+                        };
+                    }
+                    
+                    if (!usedSuggestions.has(suggestion.field)) {
                         usedSuggestions.add(suggestion.field);
                         return `${prefix}${separator}${createPlaceholderSpan(suggestion.field, suggestion.label, suggestion.sampleData)}`;
                     }
                     return match;
                 });
             });
+            
+            // Helper function để lấy sample data
+            function getSampleDataForType(type) {
+                const samples = {
+                    'fullname': 'Nguyễn Văn A',
+                    'address': '123 Đường ABC, Quận 1, TP.HCM',
+                    'idcard': '001234567890',
+                    'phone': '0901234567',
+                    'birthday': '01/01/1990',
+                    'email': 'email@example.com',
+                    'position': 'Giám đốc',
+                    'issue_date': '01/01/2020',
+                    'issue_place': 'Cục CS QLHC về TTXH'
+                };
+                return samples[type] || '';
+            }
 
             // Fourth pass: Replace remaining dots with unused suggestions
             const remainingSuggestions = suggestions.filter(s => !usedSuggestions.has(s.field));
