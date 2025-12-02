@@ -3,10 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat AI - Tư vấn Pháp lý</title>
+    <title>Chat AI - Tạo Hợp đồng</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .sidebar {
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .nav-link.active {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 8px;
+        }
+        .nav-link:hover {
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: #f8f9fa;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 85%;
+        }
+        .message.user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: auto;
+        }
+        .message.bot {
+            background-color: white;
+            border: 1px solid #e9ecef;
+        }
+        .contract-card {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .contract-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .contract-card.selected {
+            border-color: #667eea;
+            background-color: #f0f4ff;
+        }
+        .extracted-data-badge {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .missing-field {
+            border-color: #ffc107 !important;
+            background-color: #fff8e1;
+        }
+        .field-filled {
+            border-color: #28a745 !important;
+            background-color: #e8f5e9;
+        }
+        .placeholder-inline {
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin: 0 2px;
+        }
+        .placeholder-inline.filled {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .placeholder-inline.missing {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: #333;
+        }
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 10px;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background-color: #667eea;
+            border-radius: 50%;
+            animation: typing 1s infinite;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+        .contract-preview {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+    </style>
 </head>
 <body>
     <div class="container-fluid">
@@ -34,84 +148,724 @@
 
             <!-- Main Content -->
             <div class="col-md-10 p-4 main-content">
-                <div class="bg-white rounded shadow-sm p-4" style="max-width: 1000px; margin: 0 auto;">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4 class="mb-0">
-                            <i class="bi bi-robot me-2"></i>Chat AI - Tư vấn Pháp lý
-                        </h4>
-                        <button class="btn btn-sm btn-outline-danger" onclick="clearChat()">
-                            <i class="bi bi-trash me-2"></i>Xóa lịch sử chat
-                        </button>
-                    </div>
-                    
-                    <div class="chat-container mb-3" id="chatContainer">
-                        <div class="message bot">
-                            <div class="d-flex align-items-start">
-                                <i class="bi bi-robot me-2" style="font-size: 24px; color: #667eea;"></i>
-                                <div>
-                                    <strong>AI Assistant</strong>
-                                    <p class="mb-0 mt-2">Xin chào! Tôi là trợ lý AI pháp lý. Tôi có thể giúp bạn:</p>
-                                    <ul class="mb-0 mt-2">
-                                        <li>Tư vấn về các vấn đề pháp lý</li>
-                                        <li>Tạo hợp đồng dựa trên thông tin bạn cung cấp</li>
-                                        <li>Giải đáp thắc mắc về hợp đồng công chứng</li>
-                                    </ul>
+                <div class="row">
+                    <!-- Chat Section -->
+                    <div class="col-md-6">
+                        <div class="bg-white rounded shadow-sm p-4 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-robot me-2"></i>Chat AI - Tạo Hợp đồng
+                                </h5>
+                                <button class="btn btn-sm btn-outline-danger" onclick="clearChat()">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Extracted Data Info -->
+                            <div id="extractedDataInfo" class="mb-3" style="display: none;">
+                                <div class="extracted-data-badge">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    <span id="extractedDataCount">0</span> thông tin đã được trích xuất
                                 </div>
                             </div>
-                            <small class="text-muted d-block mt-2">Hôm nay lúc 05:22</small>
-                        </div>
-                    </div>
+                            
+                            <div class="chat-container mb-3" id="chatContainer">
+                                <!-- Messages will be added here -->
+                            </div>
 
-                    <div class="row">
-                        <div class="col-12">
                             <div class="input-group">
                                 <input type="text" 
-                                       class="form-control form-control-lg" 
+                                       class="form-control" 
                                        id="chatInput" 
-                                       placeholder="Nhập tin nhắn của bạn..."
+                                       placeholder="Nhập tin nhắn... (VD: Tôi cần tạo hợp đồng thuê nhà)"
                                        onkeypress="handleKeyPress(event)">
-                                <button class="btn btn-primary btn-lg" onclick="sendMessage()" id="sendBtn">
+                                <button class="btn btn-primary" onclick="sendMessage()" id="sendBtn">
                                     <i class="bi bi-send-fill"></i>
                                 </button>
                             </div>
+                            
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    Gợi ý: "Tạo hợp đồng thuê nhà", "Hợp đồng mua bán", "Liệt kê các hợp đồng"
+                                </small>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="mt-3">
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Gợi ý: Bạn có thể hỏi về "Hợp đồng thuê nhà cần những gì?" hoặc "Tôi muốn tạo hợp đồng mua bán"
-                        </small>
+                    <!-- Contract Preview Section -->
+                    <div class="col-md-6">
+                        <div class="bg-white rounded shadow-sm p-4 h-100">
+                            <h5 class="mb-3">
+                                <i class="bi bi-file-earmark-text me-2"></i>Hợp đồng
+                            </h5>
+                            
+                            <!-- Contract Selection -->
+                            <div id="contractSelection" style="display: none;">
+                                <p class="text-muted mb-3">Chọn mẫu hợp đồng bạn muốn sử dụng:</p>
+                                <div id="contractsList"></div>
+                            </div>
+                            
+                            <!-- Missing Fields Form -->
+                            <div id="missingFieldsForm" style="display: none;">
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Thiếu thông tin!</strong> Vui lòng bổ sung các thông tin sau:
+                                </div>
+                                <div id="missingFieldsList"></div>
+                                <button class="btn btn-primary w-100 mt-3" onclick="submitMissingFields()">
+                                    <i class="bi bi-check-lg me-2"></i>Hoàn thành
+                                </button>
+                            </div>
+                            
+                            <!-- Contract Preview -->
+                            <div id="contractPreviewSection" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-success">Hợp đồng đã hoàn thành</span>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-primary me-2" onclick="downloadContract()">
+                                            <i class="bi bi-download me-2"></i>Tải Word
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="printContract()">
+                                            <i class="bi bi-printer me-2"></i>In
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="contract-preview" id="contractPreview"></div>
+                            </div>
+                            
+                            <!-- Default State -->
+                            <div id="defaultState">
+                                <div class="text-center text-muted py-5">
+                                    <i class="bi bi-chat-left-text" style="font-size: 48px;"></i>
+                                    <p class="mt-3">Hãy chat với AI để bắt đầu tạo hợp đồng</p>
+                                    <p class="small">Hoặc nhấn nút bên dưới để xem các hợp đồng có sẵn</p>
+                                    <button class="btn btn-outline-primary" onclick="showAvailableContracts()">
+                                        <i class="bi bi-list-ul me-2"></i>Xem danh sách hợp đồng
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contract Preview Modal -->
-    <div class="modal fade" id="contractModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="bi bi-file-earmark-text me-2"></i>Hợp đồng được tạo
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="contractPreview"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                    <button type="button" class="btn btn-primary" onclick="downloadContract()">
-                        <i class="bi bi-download me-2"></i>Tải xuống
-                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/user-chat.js"></script>
+    <script>
+        // ========== CONFIGURATION ==========
+        const CONTRACTS_DB_API = window.location.origin + '/api/contracts-db.php';
+        const GEMINI_API_KEY = 'AIzaSyD_6P9ZJW2Yu436attBF0KF8TTLJt7rQAE';
+        const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+        // ========== STATE ==========
+        let extractedData = {};
+        let availableContracts = [];
+        let selectedContract = null;
+        let filledData = {};
+        let missingFields = [];
+        let chatHistory = [];
+
+        // ========== INITIALIZATION ==========
+        window.addEventListener('load', async () => {
+            // Load extracted data from sessionStorage
+            loadExtractedData();
+            
+            // Load available contracts from database
+            await loadAvailableContracts();
+            
+            // Check if coming from extract page
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('fromExtract') === 'true') {
+                // Show welcome message with extracted data
+                showWelcomeWithData();
+            } else {
+                // Show default welcome
+                showDefaultWelcome();
+            }
+        });
+
+        function loadExtractedData() {
+            const stored = sessionStorage.getItem('extractedData');
+            if (stored) {
+                const data = JSON.parse(stored);
+                extractedData = data;
+                
+                // Flatten data for easier use
+                filledData = flattenExtractedData(data);
+                
+                // Show extracted data info
+                const count = Object.keys(filledData).length;
+                if (count > 0) {
+                    document.getElementById('extractedDataInfo').style.display = 'block';
+                    document.getElementById('extractedDataCount').textContent = count;
+                }
+            }
+        }
+
+        function flattenExtractedData(data) {
+            const flattened = {};
+            
+            // Process CCCD data
+            if (data.cccd) {
+                Object.entries(data.cccd).forEach(([party, info]) => {
+                    Object.entries(info).forEach(([key, value]) => {
+                        if (value) {
+                            // Create multiple key variations for matching
+                            flattened[`${key}_${party.toLowerCase()}`] = value;
+                            flattened[`${key}_ben_${party.toLowerCase()}`] = value;
+                            if (party === 'A') {
+                                flattened[key] = value; // Default to first party
+                                flattened[`${key}_ben_a`] = value;
+                            }
+                            if (party === 'B') {
+                                flattened[`${key}_ben_b`] = value;
+                            }
+                        }
+                    });
+                });
+            }
+            
+            // Process other document data
+            if (data.other) {
+                Object.entries(data.other).forEach(([party, info]) => {
+                    Object.entries(info).forEach(([key, value]) => {
+                        if (value) {
+                            flattened[`${key}_${party.toLowerCase()}`] = value;
+                        }
+                    });
+                });
+            }
+            
+            return flattened;
+        }
+
+        async function loadAvailableContracts() {
+            try {
+                const response = await fetch(CONTRACTS_DB_API);
+                const data = await response.json();
+                
+                if (Array.isArray(data)) {
+                    availableContracts = data;
+                    console.log(`Loaded ${availableContracts.length} contracts from database`);
+                }
+            } catch (error) {
+                console.error('Error loading contracts:', error);
+            }
+        }
+
+        // ========== CHAT FUNCTIONS ==========
+        function showDefaultWelcome() {
+            addBotMessage(`Xin chào! Tôi là trợ lý AI giúp bạn tạo hợp đồng.
+            
+Tôi có thể giúp bạn:
+• Tạo hợp đồng từ các mẫu có sẵn
+• Điền thông tin tự động từ giấy tờ đã trích xuất
+• Kiểm tra và bổ sung thông tin còn thiếu
+
+Bạn muốn tạo loại hợp đồng nào? (VD: hợp đồng thuê nhà, mua bán, ủy quyền...)`);
+        }
+
+        function showWelcomeWithData() {
+            const partyCount = Object.keys(extractedData.cccd || {}).length;
+            const fieldCount = Object.keys(filledData).length;
+            
+            addBotMessage(`Tuyệt vời! Tôi đã nhận được thông tin từ ${partyCount} đương sự với ${fieldCount} trường dữ liệu.
+
+📋 **Thông tin đã có:**
+${Object.entries(extractedData.cccd || {}).map(([party, data]) => 
+    `• Đương sự ${party}: ${data.fullname || 'N/A'}`
+).join('\n')}
+
+Bây giờ bạn muốn tạo loại hợp đồng nào?
+${availableContracts.length > 0 ? `\n📂 Hệ thống có ${availableContracts.length} mẫu hợp đồng sẵn có.` : ''}
+
+💡 Gợi ý: "Tạo hợp đồng thuê nhà" hoặc "Xem danh sách hợp đồng"`);
+        }
+
+        function addBotMessage(text, isHtml = false) {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = 'message bot';
+            
+            if (isHtml) {
+                div.innerHTML = `
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-robot me-2" style="font-size: 20px; color: #667eea;"></i>
+                        <div class="flex-grow-1">${text}</div>
+                    </div>
+                `;
+            } else {
+                div.innerHTML = `
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-robot me-2" style="font-size: 20px; color: #667eea;"></i>
+                        <div class="flex-grow-1">${text.replace(/\n/g, '<br>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</div>
+                    </div>
+                `;
+            }
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            
+            chatHistory.push({ role: 'bot', content: text });
+        }
+
+        function addUserMessage(text) {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = 'message user';
+            div.innerHTML = `<div>${text}</div>`;
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            
+            chatHistory.push({ role: 'user', content: text });
+        }
+
+        function showTypingIndicator() {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = 'message bot';
+            div.id = 'typingIndicator';
+            div.innerHTML = `
+                <div class="typing-indicator">
+                    <span></span><span></span><span></span>
+                </div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            addUserMessage(message);
+            input.value = '';
+            
+            showTypingIndicator();
+            
+            try {
+                await processUserMessage(message);
+            } catch (error) {
+                console.error('Error processing message:', error);
+                addBotMessage('Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.');
+            }
+            
+            hideTypingIndicator();
+        }
+
+        async function processUserMessage(message) {
+            const lowerMessage = message.toLowerCase();
+            
+            // Check for contract creation intent
+            if (lowerMessage.includes('hợp đồng') || 
+                lowerMessage.includes('tạo') || 
+                lowerMessage.includes('lập') ||
+                lowerMessage.includes('thuê') ||
+                lowerMessage.includes('mua bán') ||
+                lowerMessage.includes('ủy quyền')) {
+                
+                // Find matching contracts
+                const matches = findMatchingContracts(message);
+                
+                if (matches.length > 0) {
+                    showContractOptions(matches, message);
+                } else if (availableContracts.length > 0) {
+                    addBotMessage(`Tôi không tìm thấy mẫu hợp đồng phù hợp với "${message}".
+
+Đây là các mẫu hợp đồng có sẵn trong hệ thống:`);
+                    showAvailableContracts();
+                } else {
+                    addBotMessage(`Hiện tại chưa có mẫu hợp đồng nào trong hệ thống.
+
+Vui lòng liên hệ Admin để thêm mẫu hợp đồng, hoặc bạn có thể mô tả loại hợp đồng cần tạo và tôi sẽ hỗ trợ.`);
+                }
+            }
+            // List contracts
+            else if (lowerMessage.includes('danh sách') || 
+                     lowerMessage.includes('liệt kê') || 
+                     lowerMessage.includes('xem') ||
+                     lowerMessage.includes('có gì')) {
+                showAvailableContracts();
+            }
+            // General chat - use AI
+            else {
+                await chatWithAI(message);
+            }
+        }
+
+        function findMatchingContracts(query) {
+            const lowerQuery = query.toLowerCase();
+            const keywords = lowerQuery.split(/\s+/);
+            
+            return availableContracts.filter(contract => {
+                const name = contract.name.toLowerCase();
+                return keywords.some(keyword => 
+                    keyword.length > 2 && name.includes(keyword)
+                );
+            });
+        }
+
+        function showContractOptions(contracts, userQuery) {
+            if (contracts.length === 1) {
+                addBotMessage(`Tôi tìm thấy mẫu hợp đồng phù hợp: **${contracts[0].name}**
+                
+Bạn có muốn sử dụng mẫu này không?`);
+            } else {
+                addBotMessage(`Tôi tìm thấy ${contracts.length} mẫu hợp đồng phù hợp. Vui lòng chọn một mẫu:`);
+            }
+            
+            showContractSelection(contracts);
+        }
+
+        function showAvailableContracts() {
+            if (availableContracts.length === 0) {
+                addBotMessage('Hiện tại chưa có mẫu hợp đồng nào trong hệ thống. Vui lòng liên hệ Admin để thêm mẫu.');
+                return;
+            }
+            
+            addBotMessage(`📂 Có ${availableContracts.length} mẫu hợp đồng trong hệ thống. Vui lòng chọn một mẫu bên phải.`);
+            showContractSelection(availableContracts);
+        }
+
+        function showContractSelection(contracts) {
+            document.getElementById('defaultState').style.display = 'none';
+            document.getElementById('contractSelection').style.display = 'block';
+            document.getElementById('missingFieldsForm').style.display = 'none';
+            document.getElementById('contractPreviewSection').style.display = 'none';
+            
+            const container = document.getElementById('contractsList');
+            container.innerHTML = '';
+            
+            contracts.forEach((contract, index) => {
+                const card = document.createElement('div');
+                card.className = 'contract-card';
+                card.onclick = () => selectContract(contract.id);
+                card.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">${contract.name}</h6>
+                            <small class="text-muted">
+                                <i class="bi bi-file-earmark me-1"></i>${contract.file_type === 'word' ? 'Word' : 'PDF'}
+                                <span class="ms-2"><i class="bi bi-calendar me-1"></i>${formatDate(contract.created_at)}</span>
+                            </small>
+                        </div>
+                        <i class="bi bi-chevron-right text-muted"></i>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function selectContract(contractId) {
+            // Show loading
+            addBotMessage('Đang tải mẫu hợp đồng...');
+            
+            try {
+                // Load full contract data
+                const response = await fetch(`${CONTRACTS_DB_API}?id=${contractId}`);
+                const contract = await response.json();
+                
+                if (!contract || contract.error) {
+                    throw new Error('Không thể tải hợp đồng');
+                }
+                
+                selectedContract = contract;
+                
+                // Parse placeholder mappings
+                let placeholders = [];
+                if (contract.placeholder_mappings) {
+                    placeholders = typeof contract.placeholder_mappings === 'string' 
+                        ? JSON.parse(contract.placeholder_mappings) 
+                        : contract.placeholder_mappings;
+                }
+                
+                // Also extract from modified_content if available
+                if (contract.modified_content) {
+                    const regex = /data-field="([^"]+)"/g;
+                    let match;
+                    while ((match = regex.exec(contract.modified_content)) !== null) {
+                        const field = match[1];
+                        if (!placeholders.some(p => p.field === field)) {
+                            placeholders.push({ field: field, label: field });
+                        }
+                    }
+                }
+                
+                // Find missing fields
+                missingFields = findMissingFields(placeholders);
+                
+                if (missingFields.length > 0) {
+                    addBotMessage(`Đã chọn hợp đồng: **${contract.name}**
+
+⚠️ Có ${missingFields.length} thông tin còn thiếu cần bổ sung.
+Vui lòng điền vào form bên phải.`);
+                    showMissingFieldsForm();
+                } else {
+                    addBotMessage(`Đã chọn hợp đồng: **${contract.name}**
+
+✅ Tất cả thông tin đã đầy đủ! Đang tạo hợp đồng...`);
+                    generateContract();
+                }
+                
+            } catch (error) {
+                console.error('Error loading contract:', error);
+                addBotMessage('Lỗi khi tải hợp đồng. Vui lòng thử lại.');
+            }
+        }
+
+        function findMissingFields(placeholders) {
+            const missing = [];
+            
+            placeholders.forEach(placeholder => {
+                const field = placeholder.field;
+                const label = placeholder.label || field;
+                
+                // Check if we have this data
+                const value = findFieldValue(field);
+                
+                if (!value) {
+                    missing.push({
+                        field: field,
+                        label: label,
+                        sampleData: placeholder.sampleData || ''
+                    });
+                }
+            });
+            
+            return missing;
+        }
+
+        function findFieldValue(field) {
+            // Try exact match first
+            if (filledData[field]) return filledData[field];
+            
+            // Try variations
+            const fieldLower = field.toLowerCase();
+            
+            for (const [key, value] of Object.entries(filledData)) {
+                if (key.toLowerCase() === fieldLower) return value;
+                if (key.toLowerCase().includes(fieldLower) || fieldLower.includes(key.toLowerCase())) return value;
+            }
+            
+            return null;
+        }
+
+        function showMissingFieldsForm() {
+            document.getElementById('defaultState').style.display = 'none';
+            document.getElementById('contractSelection').style.display = 'none';
+            document.getElementById('missingFieldsForm').style.display = 'block';
+            document.getElementById('contractPreviewSection').style.display = 'none';
+            
+            const container = document.getElementById('missingFieldsList');
+            container.innerHTML = '';
+            
+            missingFields.forEach((field, index) => {
+                const div = document.createElement('div');
+                div.className = 'mb-3';
+                div.innerHTML = `
+                    <label class="form-label">
+                        ${field.label}
+                        <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" 
+                           class="form-control missing-field" 
+                           id="field_${field.field}"
+                           placeholder="${field.sampleData || 'Nhập ' + field.label}"
+                           data-field="${field.field}">
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function submitMissingFields() {
+            // Collect values from form
+            let allFilled = true;
+            
+            missingFields.forEach(field => {
+                const input = document.getElementById(`field_${field.field}`);
+                const value = input.value.trim();
+                
+                if (value) {
+                    filledData[field.field] = value;
+                    input.classList.remove('missing-field');
+                    input.classList.add('field-filled');
+                } else {
+                    allFilled = false;
+                    input.classList.add('is-invalid');
+                }
+            });
+            
+            if (!allFilled) {
+                addBotMessage('⚠️ Vui lòng điền đầy đủ các thông tin còn thiếu.');
+                return;
+            }
+            
+            addBotMessage('✅ Đã nhận đủ thông tin! Đang tạo hợp đồng...');
+            generateContract();
+        }
+
+        function generateContract() {
+            if (!selectedContract) return;
+            
+            document.getElementById('defaultState').style.display = 'none';
+            document.getElementById('contractSelection').style.display = 'none';
+            document.getElementById('missingFieldsForm').style.display = 'none';
+            document.getElementById('contractPreviewSection').style.display = 'block';
+            
+            let content = selectedContract.modified_content || selectedContract.template || '';
+            
+            // Replace placeholders with actual values
+            // Method 1: Replace placeholder spans
+            content = content.replace(/<span[^>]*class="placeholder-inline[^"]*"[^>]*data-field="([^"]+)"[^>]*>[^<]*<\/span>/g, 
+                (match, field) => {
+                    const value = filledData[field] || filledData[field.toLowerCase()] || `[${field}]`;
+                    return `<span class="placeholder-inline filled">${escapeHtml(value)}</span>`;
+                }
+            );
+            
+            // Method 2: Replace {{field}} syntax
+            content = content.replace(/\{\{([^}]+)\}\}/g, (match, field) => {
+                const value = filledData[field.trim()] || filledData[field.trim().toLowerCase()] || `[${field}]`;
+                return value;
+            });
+            
+            document.getElementById('contractPreview').innerHTML = content || '<p class="text-muted">Không có nội dung hợp đồng</p>';
+            
+            addBotMessage(`🎉 Hợp đồng **${selectedContract.name}** đã được tạo thành công!
+
+Bạn có thể:
+• Xem trước bên phải
+• Tải xuống file Word
+• In trực tiếp
+
+Cần tôi giúp gì thêm không?`);
+        }
+
+        async function chatWithAI(message) {
+            try {
+                const prompt = `Bạn là trợ lý AI chuyên về hợp đồng và pháp lý Việt Nam. 
+Hãy trả lời ngắn gọn, thân thiện.
+Nếu người dùng hỏi về việc tạo hợp đồng, hãy gợi ý họ nói "Tạo hợp đồng [loại]" hoặc "Xem danh sách hợp đồng".
+
+Người dùng: ${message}`;
+
+                const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 
+                    'Xin lỗi, tôi không thể trả lời lúc này.';
+                
+                addBotMessage(aiResponse);
+            } catch (error) {
+                console.error('AI Error:', error);
+                addBotMessage('Xin lỗi, đã có lỗi khi kết nối AI. Vui lòng thử lại.');
+            }
+        }
+
+        function clearChat() {
+            if (confirm('Xóa toàn bộ lịch sử chat?')) {
+                document.getElementById('chatContainer').innerHTML = '';
+                chatHistory = [];
+                selectedContract = null;
+                missingFields = [];
+                
+                document.getElementById('defaultState').style.display = 'block';
+                document.getElementById('contractSelection').style.display = 'none';
+                document.getElementById('missingFieldsForm').style.display = 'none';
+                document.getElementById('contractPreviewSection').style.display = 'none';
+                
+                showDefaultWelcome();
+            }
+        }
+
+        // ========== UTILITY FUNCTIONS ==========
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('vi-VN');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function downloadContract() {
+            if (!selectedContract) return;
+            
+            const content = document.getElementById('contractPreview').innerHTML;
+            
+            // Create HTML document
+            const html = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${selectedContract.name}</title>
+                    <style>
+                        body { font-family: 'Times New Roman', serif; font-size: 14pt; line-height: 1.5; margin: 40px; }
+                        .placeholder-inline { background: none; color: inherit; padding: 0; }
+                    </style>
+                </head>
+                <body>${content}</body>
+                </html>
+            `;
+            
+            const blob = new Blob([html], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${selectedContract.name}.doc`;
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
+        function printContract() {
+            const content = document.getElementById('contractPreview').innerHTML;
+            
+            const printWindow = window.open('', '', 'height=800,width=600');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${selectedContract?.name || 'Hợp đồng'}</title>
+                    <style>
+                        body { font-family: 'Times New Roman', serif; font-size: 14pt; line-height: 1.5; margin: 40px; }
+                        .placeholder-inline { background: none; color: inherit; padding: 0; }
+                    </style>
+                </head>
+                <body>${content}</body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+    </script>
 </body>
 </html>

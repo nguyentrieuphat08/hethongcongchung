@@ -267,6 +267,9 @@
                                     <button class="btn btn-primary" onclick="printDataCCCD()">
                                         <i class="bi bi-printer-fill me-2"></i>In
                                     </button>
+                                    <button class="btn btn-info" onclick="goToCreateContract()">
+                                        <i class="bi bi-file-earmark-plus me-2"></i>Tạo hợp đồng
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -289,6 +292,9 @@
                                     </button>
                                     <button class="btn btn-primary" onclick="printDataOther()">
                                         <i class="bi bi-printer-fill me-2"></i>In
+                                    </button>
+                                    <button class="btn btn-info" onclick="goToCreateContract()">
+                                        <i class="bi bi-file-earmark-plus me-2"></i>Tạo hợp đồng
                                     </button>
                                 </div>
                             </div>
@@ -961,6 +967,38 @@
         function hideAllExtractedData() {
             hideExtractedDataCCCD();
             hideExtractedDataOther();
+        }
+
+        // ========== SAVE & GO TO CONTRACT ==========
+        function saveExtractedDataToStorage() {
+            // Combine all extracted data
+            const allData = {
+                cccd: extractedDataCCCD,
+                other: extractedDataOther,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Save to sessionStorage for passing to chat page
+            sessionStorage.setItem('extractedData', JSON.stringify(allData));
+            
+            // Also save to localStorage for persistence
+            localStorage.setItem('lastExtractedData', JSON.stringify(allData));
+            
+            return allData;
+        }
+
+        function goToCreateContract() {
+            // Check if there's any extracted data
+            if (Object.keys(extractedDataCCCD).length === 0 && Object.keys(extractedDataOther).length === 0) {
+                alert('Chưa có thông tin nào được trích xuất!');
+                return;
+            }
+            
+            // Save data to storage
+            saveExtractedDataToStorage();
+            
+            // Redirect to chat page
+            window.location.href = 'user-chat.html?fromExtract=true';
         }
     </script>
 </body>
