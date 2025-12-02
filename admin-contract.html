@@ -469,8 +469,12 @@
         const PLACEHOLDERS_KEY = 'custom_placeholders';
         const API_ENDPOINT = window.location.origin + '/api/receive-contract';
         const CONTRACTS_API = window.location.origin + '/api/contracts';
+        const CONTRACTS_DB_API = window.location.origin + '/api/contracts-db.php';
         const GEMINI_API_KEY = 'AIzaSyD_6P9ZJW2Yu436attBF0KF8TTLJt7rQAE';
         const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+        
+        // Use database (true) or localStorage (false)
+        const USE_DATABASE = true;
         
         // Multiple CORS proxies to try
         const CORS_PROXIES = [
@@ -574,14 +578,46 @@
 
         // ========== CONTRACTS MANAGEMENT ==========
         async function loadContracts() {
-            // Load from localStorage first
-            const saved = localStorage.getItem(CONTRACTS_KEY);
-            contracts = saved ? JSON.parse(saved) : [];
-            
-            // Then fetch from API to get contracts from n8n
-            await fetchContractsFromAPI();
+            if (USE_DATABASE) {
+                // Load from database
+                await fetchContractsFromDatabase();
+            } else {
+                // Load from localStorage
+                const saved = localStorage.getItem(CONTRACTS_KEY);
+                contracts = saved ? JSON.parse(saved) : [];
+            }
             
             renderContractSelect();
+        }
+
+        async function fetchContractsFromDatabase() {
+            try {
+                const response = await fetch(CONTRACTS_DB_API);
+                const data = await response.json();
+                
+                if (Array.isArray(data)) {
+                    // Map database fields to frontend format
+                    contracts = data.map(c => ({
+                        id: c.id,
+                        name: c.name,
+                        url: c.file_data,
+                        fileType: c.file_type,
+                        modifiedContent: c.modified_content,
+                        template: c.template,
+                        placeholderMappings: c.placeholder_mappings ? JSON.parse(c.placeholder_mappings) : [],
+                        markers: c.markers ? JSON.parse(c.markers) : [],
+                        isLocal: true,
+                        createdAt: c.created_at
+                    }));
+                    console.log(`Đã tải ${contracts.length} hợp đồng từ database`);
+                }
+            } catch (error) {
+                console.error('Lỗi tải hợp đồng từ database:', error);
+                showToast('Cảnh báo', 'Không thể kết nối database, sử dụng localStorage', 'warning');
+                // Fallback to localStorage
+                const saved = localStorage.getItem(CONTRACTS_KEY);
+                contracts = saved ? JSON.parse(saved) : [];
+            }
         }
 
         async function fetchContractsFromAPI() {
@@ -607,7 +643,12 @@
         }
 
         function saveContracts() {
-            localStorage.setItem(CONTRACTS_KEY, JSON.stringify(contracts));
+            if (USE_DATABASE) {
+                // Database saves are done individually in addContract/deleteContract
+                console.log('Contracts saved in database');
+            } else {
+                localStorage.setItem(CONTRACTS_KEY, JSON.stringify(contracts));
+            }
         }
 
         function renderContractSelect() {
@@ -665,13 +706,33 @@
             document.getElementById('newContractUrl').value = '';
         }
 
-        function deleteSelectedContract() {
+        async function deleteSelectedContract() {
             const select = document.getElementById('contractSelect');
             const index = parseInt(select.value);
             
             if (isNaN(index)) return;
             
-            if (confirm(`Bạn có chắc muốn xóa hợp đồng "${contracts[index].name}"?`)) {
+            const contractToDelete = contracts[index];
+            
+            if (confirm(`Bạn có chắc muốn xóa hợp đồng "${contractToDelete.name}"?`)) {
+                if (USE_DATABASE && contractToDelete.id) {
+                    try {
+                        const response = await fetch(`${CONTRACTS_DB_API}?id=${contractToDelete.id}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (!result.success) {
+                            throw new Error(result.error || 'Lỗi xóa hợp đồng');
+                        }
+                    } catch (error) {
+                        console.error('Lỗi xóa từ database:', error);
+                        showToast('Lỗi', 'Không thể xóa từ database: ' + error.message, 'error');
+                        return;
+                    }
+                }
+                
                 contracts.splice(index, 1);
                 saveContracts();
                 renderContractSelect();
@@ -696,7 +757,7 @@
         }
 
         // Upload PDF or Word file from computer
-        function uploadContractFile() {
+        async function uploadContractFile() {
             const name = document.getElementById('uploadContractName').value.trim();
             const fileInput = document.getElementById('uploadContractFile');
             const file = fileInput.files[0];
@@ -728,23 +789,59 @@
 
             // Read file
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 const dataUrl = e.target.result;
+                const fileType = isPdf ? 'pdf' : 'word';
                 
-                contracts.push({
-                    id: 'contract_' + Date.now(),
-                    name,
-                    url: dataUrl,
-                    fileType: isPdf ? 'pdf' : 'word',
-                    isLocal: true,
-                    description: '',
-                    markers: [],
-                    createdAt: new Date().toISOString()
-                });
+                if (USE_DATABASE) {
+                    // Save to database
+                    try {
+                        showToast('Đang lưu', 'Đang upload hợp đồng...', 'info');
+                        
+                        const response = await fetch(CONTRACTS_DB_API, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                name: name,
+                                file_type: fileType,
+                                file_data: dataUrl,
+                                placeholder_mappings: [],
+                                markers: []
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // Reload contracts from database
+                            await loadContracts();
+                            showToast('Thành công', `Đã upload và lưu hợp đồng: ${name}`, 'success');
+                        } else {
+                            throw new Error(result.error || 'Lỗi lưu hợp đồng');
+                        }
+                    } catch (error) {
+                        console.error('Lỗi lưu database:', error);
+                        showToast('Lỗi', 'Không thể lưu vào database: ' + error.message, 'error');
+                    }
+                } else {
+                    // Save to localStorage
+                    contracts.push({
+                        id: 'contract_' + Date.now(),
+                        name,
+                        url: dataUrl,
+                        fileType: fileType,
+                        isLocal: true,
+                        description: '',
+                        markers: [],
+                        createdAt: new Date().toISOString()
+                    });
 
-                saveContracts();
-                renderContractSelect();
-                showToast('Thành công', `Đã upload hợp đồng: ${name}`, 'success');
+                    saveContracts();
+                    renderContractSelect();
+                    showToast('Thành công', `Đã upload hợp đồng: ${name}`, 'success');
+                }
                 
                 // Clear form
                 document.getElementById('uploadContractName').value = '';
@@ -1335,7 +1432,7 @@
         }
 
         // ========== SAVE CONFIG ==========
-        function saveContractConfig() {
+        async function saveContractConfig() {
             if (!currentContract) return;
             
             const select = document.getElementById('contractSelect');
@@ -1343,26 +1440,60 @@
             
             const fileType = currentContract.fileType || 'pdf';
             
+            let updateData = {
+                id: currentContract.id
+            };
+            
             if (fileType === 'word') {
                 // For Word: save both display content and template
                 const wordContent = document.getElementById('wordContent');
                 if (wordContent) {
                     // Save current display content
+                    updateData.modified_content = wordContent.innerHTML;
                     contracts[index].modifiedContent = wordContent.innerHTML;
                     
                     // Generate template with {{placeholders}} for later use
                     const template = generateTemplate(wordContent);
+                    updateData.template = template;
                     contracts[index].template = template;
                 }
+                updateData.placeholder_mappings = placeholderMappings;
                 contracts[index].placeholderMappings = placeholderMappings;
             } else {
                 // For PDF: save markers
+                updateData.markers = markers;
                 contracts[index].markers = markers;
             }
             
-            saveContracts();
-            
-            showToast('Đã lưu', 'Cấu hình đã được lưu thành công', 'success');
+            if (USE_DATABASE) {
+                try {
+                    showToast('Đang lưu', 'Đang lưu cấu hình...', 'info');
+                    
+                    const response = await fetch(CONTRACTS_DB_API, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updateData)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showToast('Đã lưu', 'Cấu hình đã được lưu vào database', 'success');
+                    } else {
+                        throw new Error(result.error || 'Lỗi lưu cấu hình');
+                    }
+                } catch (error) {
+                    console.error('Lỗi lưu database:', error);
+                    showToast('Lỗi', 'Không thể lưu vào database: ' + error.message, 'error');
+                    // Fallback: save to localStorage
+                    saveContracts();
+                }
+            } else {
+                saveContracts();
+                showToast('Đã lưu', 'Cấu hình đã được lưu thành công', 'success');
+            }
         }
 
         function generateTemplate(container) {
