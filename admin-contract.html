@@ -597,17 +597,19 @@
                 
                 if (Array.isArray(data)) {
                     // Map database fields to frontend format
+                    // Note: file_data is not included in list, will be loaded when selecting
                     contracts = data.map(c => ({
                         id: c.id,
                         name: c.name,
-                        url: c.file_data,
+                        url: null, // Will be loaded when selected
                         fileType: c.file_type,
-                        modifiedContent: c.modified_content,
-                        template: c.template,
-                        placeholderMappings: c.placeholder_mappings ? JSON.parse(c.placeholder_mappings) : [],
-                        markers: c.markers ? JSON.parse(c.markers) : [],
+                        modifiedContent: null,
+                        template: null,
+                        placeholderMappings: [],
+                        markers: [],
                         isLocal: true,
-                        createdAt: c.created_at
+                        createdAt: c.created_at,
+                        needsLoad: true // Flag to indicate data needs to be loaded
                     }));
                     console.log(`Đã tải ${contracts.length} hợp đồng từ database`);
                 }
@@ -617,6 +619,34 @@
                 // Fallback to localStorage
                 const saved = localStorage.getItem(CONTRACTS_KEY);
                 contracts = saved ? JSON.parse(saved) : [];
+            }
+        }
+
+        // Load full contract data from database
+        async function loadContractFromDatabase(contractId) {
+            try {
+                const response = await fetch(`${CONTRACTS_DB_API}?id=${contractId}`);
+                const data = await response.json();
+                
+                if (data && data.id) {
+                    return {
+                        id: data.id,
+                        name: data.name,
+                        url: data.file_data,
+                        fileType: data.file_type,
+                        modifiedContent: data.modified_content,
+                        template: data.template,
+                        placeholderMappings: data.placeholder_mappings ? JSON.parse(data.placeholder_mappings) : [],
+                        markers: data.markers ? JSON.parse(data.markers) : [],
+                        isLocal: true,
+                        createdAt: data.created_at,
+                        needsLoad: false
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error('Lỗi tải chi tiết hợp đồng:', error);
+                return null;
             }
         }
 
@@ -1124,6 +1154,25 @@
             }
             
             document.getElementById('deleteContractBtn').style.display = 'block';
+            
+            // Show loading
+            document.getElementById('pdfContainer').innerHTML = `
+                <div class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-3">Đang tải hợp đồng...</p>
+                </div>
+            `;
+            
+            // If using database and contract needs to load full data
+            if (USE_DATABASE && contracts[index].needsLoad) {
+                const fullContract = await loadContractFromDatabase(contracts[index].id);
+                if (fullContract) {
+                    contracts[index] = fullContract;
+                } else {
+                    showToast('Lỗi', 'Không thể tải dữ liệu hợp đồng', 'error');
+                    return;
+                }
+            }
             
             currentContract = contracts[index];
             markers = currentContract.markers || [];
