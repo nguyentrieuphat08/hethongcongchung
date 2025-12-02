@@ -1,4 +1,7 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
@@ -12,6 +15,8 @@ $result = [
 ];
 
 try {
+    $pdo = getDB();
+    
     // Test connection
     $result['status'] = 'success';
     $result['message'] = 'Kết nối database thành công!';
@@ -36,6 +41,9 @@ try {
     }
     
 } catch (PDOException $e) {
+    $result['status'] = 'error';
+    $result['message'] = 'Lỗi PDO: ' . $e->getMessage();
+} catch (Exception $e) {
     $result['status'] = 'error';
     $result['message'] = 'Lỗi: ' . $e->getMessage();
 }
