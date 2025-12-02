@@ -635,8 +635,8 @@ Vui lòng điền vào form bên phải.`);
                 const field = placeholder.field;
                 const label = placeholder.label || field;
                 
-                // Check if we have this data
-                const value = findFieldValue(field);
+                // Check if we have data for this field using the same logic as generateContract
+                const value = getValueForField(field);
                 
                 if (!value) {
                     missing.push({
@@ -648,21 +648,6 @@ Vui lòng điền vào form bên phải.`);
             });
             
             return missing;
-        }
-
-        function findFieldValue(field) {
-            // Try exact match first
-            if (filledData[field]) return filledData[field];
-            
-            // Try variations
-            const fieldLower = field.toLowerCase();
-            
-            for (const [key, value] of Object.entries(filledData)) {
-                if (key.toLowerCase() === fieldLower) return value;
-                if (key.toLowerCase().includes(fieldLower) || fieldLower.includes(key.toLowerCase())) return value;
-            }
-            
-            return null;
         }
 
         function showMissingFieldsForm() {
@@ -729,31 +714,35 @@ Vui lòng điền vào form bên phải.`);
             
             let content = selectedContract.modified_content || selectedContract.template || '';
             
+            console.log('=== GENERATE CONTRACT ===');
             console.log('FilledData:', filledData);
-            console.log('Original content length:', content.length);
             
-            // Replace placeholders with actual values
-            // Method 1: Replace placeholder spans (including those with inner elements)
+            // Only replace placeholders that admin has configured
+            // Method 1: Replace placeholder spans with data-field attribute
             content = content.replace(/<span[^>]*class="[^"]*placeholder-inline[^"]*"[^>]*data-field="([^"]+)"[^>]*>[\s\S]*?<\/span>/gi, 
                 (match, field) => {
-                    const value = findBestMatch(field);
-                    console.log(`Replacing field "${field}" with value "${value}"`);
-                    if (value && value !== `[${field}]`) {
+                    // Only replace if we have data for this exact field
+                    const value = getValueForField(field);
+                    console.log(`Field "${field}" => Value "${value}"`);
+                    
+                    if (value) {
+                        // Replace with actual value, styled green
                         return `<span style="color: #28a745; font-weight: 500;">${escapeHtml(value)}</span>`;
+                    } else {
+                        // Keep placeholder visible in red if no data
+                        return `<span style="color: #dc3545; background: #fff3cd; padding: 2px 6px; border-radius: 3px;">[${field}]</span>`;
                     }
-                    return `<span style="color: #dc3545;">[${field}]</span>`;
                 }
             );
             
-            // Method 2: Replace {{field}} syntax
+            // Method 2: Replace {{field}} syntax in template
             content = content.replace(/\{\{([^}]+)\}\}/g, (match, field) => {
-                const value = findBestMatch(field.trim());
-                return value || `[${field}]`;
+                const value = getValueForField(field.trim());
+                if (value) {
+                    return `<span style="color: #28a745; font-weight: 500;">${escapeHtml(value)}</span>`;
+                }
+                return `<span style="color: #dc3545;">[${field.trim()}]</span>`;
             });
-            
-            // Method 3: Replace remaining dots patterns with data if available
-            // Ông/Bà: ............... -> Ông/Bà: Nguyễn Văn A
-            content = replaceDotsWithData(content);
             
             document.getElementById('contractPreview').innerHTML = content || '<p class="text-muted">Không có nội dung hợp đồng</p>';
             
@@ -767,78 +756,90 @@ Bạn có thể:
 Cần tôi giúp gì thêm không?`);
         }
 
-        function findBestMatch(field) {
+        // Get value for a specific field from extracted data
+        function getValueForField(field) {
             if (!field) return null;
             
-            const fieldLower = field.toLowerCase().replace(/_/g, '');
+            console.log(`Looking for field: "${field}"`);
             
-            // Direct match
-            if (filledData[field]) return filledData[field];
-            if (filledData[field.toLowerCase()]) return filledData[field.toLowerCase()];
+            // 1. Exact match first
+            if (filledData[field]) {
+                console.log(`  -> Exact match found: ${filledData[field]}`);
+                return filledData[field];
+            }
             
-            // Map common field names to extracted data keys
-            const fieldMappings = {
-                'fullname': ['fullname', 'hovaten', 'hoten', 'ten'],
-                'fullname_ben_a': ['fullname_a', 'fullname_ben_a', 'fullname'],
-                'fullname_ben_b': ['fullname_b', 'fullname_ben_b'],
-                'birthday': ['birthday', 'ngaysinh', 'namsinh'],
-                'idcard': ['idcard', 'cccd', 'cmnd', 'socmnd', 'socccd'],
-                'address': ['address', 'diachi', 'noio', 'thuongtru'],
-                'issue_date': ['issue_date', 'ngaycap'],
-                'expiry_date': ['expiry_date', 'ngayhethan'],
-                'phone': ['phone', 'dienthoai', 'sdt'],
-                'email': ['email']
+            // 2. Case-insensitive match
+            const fieldLower = field.toLowerCase();
+            for (const [key, value] of Object.entries(filledData)) {
+                if (key.toLowerCase() === fieldLower) {
+                    console.log(`  -> Case-insensitive match: ${key} = ${value}`);
+                    return value;
+                }
+            }
+            
+            // 3. Try common field name mappings
+            // Extract party identifier from field (e.g., fullname_ben_a -> party A)
+            const partyMatch = field.match(/[_-](ben[_-]?)?([ab])$/i);
+            const party = partyMatch ? partyMatch[2].toUpperCase() : null;
+            
+            // Get base field name without party suffix
+            const baseField = field.replace(/[_-](ben[_-]?)?[ab]$/i, '').toLowerCase();
+            
+            console.log(`  -> Base field: "${baseField}", Party: "${party}"`);
+            
+            // Map of field aliases
+            const aliases = {
+                'fullname': ['fullname', 'hovaten', 'hoten', 'name', 'ten'],
+                'birthday': ['birthday', 'ngaysinh', 'dob', 'birthdate'],
+                'idcard': ['idcard', 'cccd', 'cmnd', 'id', 'socccd', 'socmnd'],
+                'address': ['address', 'diachi', 'thuongtru', 'noio', 'dktt'],
+                'issue_date': ['issue_date', 'ngaycap', 'issuedate'],
+                'expiry_date': ['expiry_date', 'ngayhethan', 'expirydate'],
+                'phone': ['phone', 'dienthoai', 'sdt', 'mobile'],
+                'email': ['email', 'mail']
             };
             
-            // Try to find matching key
-            for (const [key, aliases] of Object.entries(fieldMappings)) {
-                if (aliases.some(a => fieldLower.includes(a) || a.includes(fieldLower))) {
-                    // Check filledData for any matching key
-                    for (const dataKey of Object.keys(filledData)) {
-                        const dataKeyLower = dataKey.toLowerCase().replace(/_/g, '');
-                        if (aliases.some(a => dataKeyLower.includes(a))) {
-                            return filledData[dataKey];
+            // Find which category this field belongs to
+            let matchedCategory = null;
+            for (const [category, aliasList] of Object.entries(aliases)) {
+                if (aliasList.some(a => baseField.includes(a) || a.includes(baseField))) {
+                    matchedCategory = category;
+                    break;
+                }
+            }
+            
+            if (matchedCategory) {
+                console.log(`  -> Matched category: ${matchedCategory}`);
+                
+                // Look for data with this category and party
+                for (const [key, value] of Object.entries(filledData)) {
+                    const keyLower = key.toLowerCase();
+                    const keyPartyMatch = key.match(/[_-]([ab])$/i);
+                    const keyParty = keyPartyMatch ? keyPartyMatch[1].toUpperCase() : null;
+                    const keyBase = key.replace(/[_-][ab]$/i, '').toLowerCase();
+                    
+                    // Check if this key matches our category
+                    const keyMatchesCategory = aliases[matchedCategory].some(a => 
+                        keyBase.includes(a) || a.includes(keyBase)
+                    );
+                    
+                    if (keyMatchesCategory) {
+                        // If field specifies a party, match party
+                        if (party && keyParty && party === keyParty) {
+                            console.log(`  -> Found with party match: ${key} = ${value}`);
+                            return value;
+                        }
+                        // If no party specified in field, return first match
+                        if (!party) {
+                            console.log(`  -> Found without party: ${key} = ${value}`);
+                            return value;
                         }
                     }
                 }
             }
             
-            // Fuzzy match - find similar keys
-            for (const [dataKey, value] of Object.entries(filledData)) {
-                const dataKeyLower = dataKey.toLowerCase().replace(/_/g, '');
-                if (dataKeyLower.includes(fieldLower) || fieldLower.includes(dataKeyLower)) {
-                    return value;
-                }
-            }
-            
+            console.log(`  -> No match found for: ${field}`);
             return null;
-        }
-
-        function replaceDotsWithData(content) {
-            // Replace common patterns like "Ông/Bà:............" with actual data
-            const patterns = [
-                { regex: /(Ông|Bà|Họ và tên|Họ tên)[:\s]*[\.…_]{3,}/gi, field: 'fullname' },
-                { regex: /(Số CCCD|CCCD|CMND|Số CMND)[:\s]*[\.…_]{3,}/gi, field: 'idcard' },
-                { regex: /(Địa chỉ|Nơi ĐKTT|Thường trú)[:\s]*[\.…_]{3,}/gi, field: 'address' },
-                { regex: /(Ngày sinh|Sinh ngày)[:\s]*[\.…_]{3,}/gi, field: 'birthday' },
-                { regex: /(Ngày cấp|Cấp ngày)[:\s]*[\.…_]{3,}/gi, field: 'issue_date' },
-                { regex: /(Điện thoại|SĐT|Số ĐT)[:\s]*[\.…_]{3,}/gi, field: 'phone' },
-            ];
-            
-            patterns.forEach(({ regex, field }) => {
-                content = content.replace(regex, (match) => {
-                    const value = findBestMatch(field);
-                    if (value) {
-                        // Keep the label part, replace only the dots
-                        const labelMatch = match.match(/^[^:\.…_]+[:\s]*/);
-                        const label = labelMatch ? labelMatch[0] : '';
-                        return `${label}<span style="color: #28a745; font-weight: 500;">${escapeHtml(value)}</span>`;
-                    }
-                    return match;
-                });
-            });
-            
-            return content;
         }
 
         async function chatWithAI(message) {
