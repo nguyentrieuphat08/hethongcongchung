@@ -1209,8 +1209,21 @@
                     </div>
                 `;
                 
+                // Get file data - could be from url field or file_data from database
+                const fileData = currentContract.url || currentContract.file_data;
+                
+                if (!fileData) {
+                    throw new Error('Không tìm thấy dữ liệu file');
+                }
+                
                 // Convert base64 to Blob
-                const base64Data = currentContract.url.split(',')[1];
+                let base64Data;
+                if (fileData.includes(',')) {
+                    base64Data = fileData.split(',')[1];
+                } else {
+                    base64Data = fileData;
+                }
+                
                 const binaryString = window.atob(base64Data);
                 const len = binaryString.length;
                 const bytes = new Uint8Array(len);
