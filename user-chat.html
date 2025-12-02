@@ -729,20 +729,31 @@ Vui lòng điền vào form bên phải.`);
             
             let content = selectedContract.modified_content || selectedContract.template || '';
             
+            console.log('FilledData:', filledData);
+            console.log('Original content length:', content.length);
+            
             // Replace placeholders with actual values
-            // Method 1: Replace placeholder spans
-            content = content.replace(/<span[^>]*class="placeholder-inline[^"]*"[^>]*data-field="([^"]+)"[^>]*>[^<]*<\/span>/g, 
+            // Method 1: Replace placeholder spans (including those with inner elements)
+            content = content.replace(/<span[^>]*class="[^"]*placeholder-inline[^"]*"[^>]*data-field="([^"]+)"[^>]*>[\s\S]*?<\/span>/gi, 
                 (match, field) => {
-                    const value = filledData[field] || filledData[field.toLowerCase()] || `[${field}]`;
-                    return `<span class="placeholder-inline filled">${escapeHtml(value)}</span>`;
+                    const value = findBestMatch(field);
+                    console.log(`Replacing field "${field}" with value "${value}"`);
+                    if (value && value !== `[${field}]`) {
+                        return `<span style="color: #28a745; font-weight: 500;">${escapeHtml(value)}</span>`;
+                    }
+                    return `<span style="color: #dc3545;">[${field}]</span>`;
                 }
             );
             
             // Method 2: Replace {{field}} syntax
             content = content.replace(/\{\{([^}]+)\}\}/g, (match, field) => {
-                const value = filledData[field.trim()] || filledData[field.trim().toLowerCase()] || `[${field}]`;
-                return value;
+                const value = findBestMatch(field.trim());
+                return value || `[${field}]`;
             });
+            
+            // Method 3: Replace remaining dots patterns with data if available
+            // Ông/Bà: ............... -> Ông/Bà: Nguyễn Văn A
+            content = replaceDotsWithData(content);
             
             document.getElementById('contractPreview').innerHTML = content || '<p class="text-muted">Không có nội dung hợp đồng</p>';
             
@@ -754,6 +765,80 @@ Bạn có thể:
 • In trực tiếp
 
 Cần tôi giúp gì thêm không?`);
+        }
+
+        function findBestMatch(field) {
+            if (!field) return null;
+            
+            const fieldLower = field.toLowerCase().replace(/_/g, '');
+            
+            // Direct match
+            if (filledData[field]) return filledData[field];
+            if (filledData[field.toLowerCase()]) return filledData[field.toLowerCase()];
+            
+            // Map common field names to extracted data keys
+            const fieldMappings = {
+                'fullname': ['fullname', 'hovaten', 'hoten', 'ten'],
+                'fullname_ben_a': ['fullname_a', 'fullname_ben_a', 'fullname'],
+                'fullname_ben_b': ['fullname_b', 'fullname_ben_b'],
+                'birthday': ['birthday', 'ngaysinh', 'namsinh'],
+                'idcard': ['idcard', 'cccd', 'cmnd', 'socmnd', 'socccd'],
+                'address': ['address', 'diachi', 'noio', 'thuongtru'],
+                'issue_date': ['issue_date', 'ngaycap'],
+                'expiry_date': ['expiry_date', 'ngayhethan'],
+                'phone': ['phone', 'dienthoai', 'sdt'],
+                'email': ['email']
+            };
+            
+            // Try to find matching key
+            for (const [key, aliases] of Object.entries(fieldMappings)) {
+                if (aliases.some(a => fieldLower.includes(a) || a.includes(fieldLower))) {
+                    // Check filledData for any matching key
+                    for (const dataKey of Object.keys(filledData)) {
+                        const dataKeyLower = dataKey.toLowerCase().replace(/_/g, '');
+                        if (aliases.some(a => dataKeyLower.includes(a))) {
+                            return filledData[dataKey];
+                        }
+                    }
+                }
+            }
+            
+            // Fuzzy match - find similar keys
+            for (const [dataKey, value] of Object.entries(filledData)) {
+                const dataKeyLower = dataKey.toLowerCase().replace(/_/g, '');
+                if (dataKeyLower.includes(fieldLower) || fieldLower.includes(dataKeyLower)) {
+                    return value;
+                }
+            }
+            
+            return null;
+        }
+
+        function replaceDotsWithData(content) {
+            // Replace common patterns like "Ông/Bà:............" with actual data
+            const patterns = [
+                { regex: /(Ông|Bà|Họ và tên|Họ tên)[:\s]*[\.…_]{3,}/gi, field: 'fullname' },
+                { regex: /(Số CCCD|CCCD|CMND|Số CMND)[:\s]*[\.…_]{3,}/gi, field: 'idcard' },
+                { regex: /(Địa chỉ|Nơi ĐKTT|Thường trú)[:\s]*[\.…_]{3,}/gi, field: 'address' },
+                { regex: /(Ngày sinh|Sinh ngày)[:\s]*[\.…_]{3,}/gi, field: 'birthday' },
+                { regex: /(Ngày cấp|Cấp ngày)[:\s]*[\.…_]{3,}/gi, field: 'issue_date' },
+                { regex: /(Điện thoại|SĐT|Số ĐT)[:\s]*[\.…_]{3,}/gi, field: 'phone' },
+            ];
+            
+            patterns.forEach(({ regex, field }) => {
+                content = content.replace(regex, (match) => {
+                    const value = findBestMatch(field);
+                    if (value) {
+                        // Keep the label part, replace only the dots
+                        const labelMatch = match.match(/^[^:\.…_]+[:\s]*/);
+                        const label = labelMatch ? labelMatch[0] : '';
+                        return `${label}<span style="color: #28a745; font-weight: 500;">${escapeHtml(value)}</span>`;
+                    }
+                    return match;
+                });
+            });
+            
+            return content;
         }
 
         async function chatWithAI(message) {
