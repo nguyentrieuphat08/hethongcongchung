@@ -1,9 +1,9 @@
 <?php
 // Database configuration
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'hethongcongchung');
-define('DB_USER', 'admin'); // Thay bằng username của bạn
-define('DB_PASS', ''); // Thay bằng password của bạn
+define('DB_NAME', 'admin_demo');
+define('DB_USER', 'admin_demo');
+define('DB_PASS', 'Mn123456789@');
 
 // Create connection
 function getDB() {
