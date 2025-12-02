@@ -726,11 +726,11 @@ Vui lòng điền vào form bên phải.`);
                     console.log(`Field "${field}" => Value "${value}"`);
                     
                     if (value) {
-                        // Replace with actual value, styled green
-                        return `<span style="color: #28a745; font-weight: 500;">${escapeHtml(value)}</span>`;
+                        // Replace with actual value, keep original text style (no color change)
+                        return escapeHtml(value);
                     } else {
-                        // Keep placeholder visible in red if no data
-                        return `<span style="color: #dc3545; background: #fff3cd; padding: 2px 6px; border-radius: 3px;">[${field}]</span>`;
+                        // Keep placeholder visible if no data
+                        return `[${field}]`;
                     }
                 }
             );
@@ -739,9 +739,9 @@ Vui lòng điền vào form bên phải.`);
             content = content.replace(/\{\{([^}]+)\}\}/g, (match, field) => {
                 const value = getValueForField(field.trim());
                 if (value) {
-                    return `<span style="color: #28a745; font-weight: 500;">${escapeHtml(value)}</span>`;
+                    return escapeHtml(value);
                 }
-                return `<span style="color: #dc3545;">[${field.trim()}]</span>`;
+                return `[${field.trim()}]`;
             });
             
             document.getElementById('contractPreview').innerHTML = content || '<p class="text-muted">Không có nội dung hợp đồng</p>';
