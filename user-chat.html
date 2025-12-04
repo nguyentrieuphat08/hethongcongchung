@@ -1087,8 +1087,9 @@ Vui lòng điền vào form bên dưới.`);
             document.getElementById('missingFieldsSection').style.display = 'block';
             document.getElementById('selectedContractName').textContent = selectedContract.name;
             
-            // Show contract preview while filling
-            const content = selectedContract.modified_content || selectedContract.template || '';
+            // Show contract preview while filling - with sample data
+            let content = selectedContract.modified_content || selectedContract.template || '';
+            content = displayWithSampleData(content);
             document.getElementById('contractPreviewWhileFilling').innerHTML = content;
             
             const container = document.getElementById('missingFieldsList');
