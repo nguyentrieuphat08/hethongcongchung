@@ -583,65 +583,48 @@ Tôi sẽ tư vấn pháp lý và gợi ý mẫu hợp đồng phù hợp!`);
                 return;
             }
             
-            const lowerMessage = message.toLowerCase();
-            
-            // Check if user wants to see/create contracts
-            if (lowerMessage.includes('xem hợp đồng') || 
-                lowerMessage.includes('danh sách') || 
-                lowerMessage.includes('liệt kê') ||
-                lowerMessage.includes('chọn mẫu') ||
-                lowerMessage.includes('tạo hợp đồng')) {
-                // Use internal AI to suggest contracts
-                await suggestContractsWithAI(message);
-            } else {
-                // Send to n8n webhook for legal consultation only
-                await chatWithN8N(message);
-            }
+            // Always do both: n8n consultation + AI contract suggestion
+            await processFullRequest(message);
         }
 
-        // Chat with n8n webhook - only for legal consultation
-        async function chatWithN8N(message) {
+        // Process full request: n8n consultation + AI contract suggestions
+        async function processFullRequest(message) {
             try {
-                const response = await fetch(N8N_WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: message,
-                        transactionType: selectedTransactionType,
-                        transactionText: selectedTransactionText,
-                        extractedData: filledData,
-                        chatHistory: chatHistory.slice(-10)
-                    })
-                });
+                // Step 1: Get legal consultation from n8n
+                let consultationMessage = '';
+                try {
+                    const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: message,
+                            transactionType: selectedTransactionType,
+                            transactionText: selectedTransactionText,
+                            extractedData: filledData,
+                            chatHistory: chatHistory.slice(-10)
+                        })
+                    });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    if (n8nResponse.ok) {
+                        const n8nData = await n8nResponse.json();
+                        consultationMessage = n8nData.message || n8nData.response || n8nData.output || '';
+                        if (typeof n8nData === 'string') consultationMessage = n8nData;
+                    }
+                } catch (e) {
+                    console.error('N8N Error:', e);
                 }
 
-                const data = await response.json();
-                
-                // Display consultation response
-                if (data.message || data.response || data.output) {
-                    const botMessage = data.message || data.response || data.output;
-                    addBotMessage(botMessage);
-                } else if (typeof data === 'string') {
-                    addBotMessage(data);
-                } else {
-                    addBotMessage('Cảm ơn bạn đã gửi thông tin. Tôi đang xử lý...');
+                // Display consultation if available
+                if (consultationMessage) {
+                    addBotMessage(`📋 **Tư vấn pháp lý:**\n\n${consultationMessage}`);
                 }
-                
-                // After consultation, ask if user wants to see contracts
-                setTimeout(() => {
-                    addBotMessage(`💡 Bạn có muốn **xem các mẫu hợp đồng** phù hợp với loại giao dịch này không?
-                    
-Gõ "**xem hợp đồng**" hoặc "**tạo hợp đồng**" để tôi gợi ý mẫu phù hợp.`);
-                }, 1000);
+
+                // Step 2: Use AI to suggest contracts
+                await suggestContractsWithAI(message);
                 
             } catch (error) {
-                console.error('N8N Webhook Error:', error);
-                addBotMessage('⚠️ Không thể kết nối hệ thống tư vấn. Vui lòng thử lại sau.');
+                console.error('Error processing request:', error);
+                addBotMessage('Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.');
             }
         }
 
