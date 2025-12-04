@@ -181,6 +181,28 @@
         .placeholder-inline .remove-placeholder-inline {
             display: none;
         }
+        .extracted-data-badge {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .extracted-data-badge:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+        .extracted-info-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .extracted-info-table tr:last-child td {
+            border-bottom: none;
+        }
+        .party-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -243,7 +265,7 @@
                     </select>
                 </div>
                 <div class="col-md-3 text-end">
-                    <span id="extractedDataInfo" class="extracted-data-badge" style="display: none;">
+                    <span id="extractedDataInfo" class="extracted-data-badge" style="display: none;" onclick="showExtractedDataModal()" title="Nhấn để xem chi tiết">
                         <i class="bi bi-check-circle me-1"></i>
                         <span id="extractedDataCount">0</span> thông tin đã trích xuất
                     </span>
@@ -359,6 +381,26 @@
         </div>
     </div>
 
+    <!-- Modal hiển thị thông tin đã trích xuất -->
+    <div class="modal fade" id="extractedDataModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-card-checklist me-2"></i>Thông tin đã trích xuất
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="extractedDataModalBody">
+                    <!-- Content will be generated -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // ========== CONFIGURATION ==========
@@ -402,13 +444,111 @@
                 // Flatten data for easier use
                 filledData = flattenExtractedData(data);
                 
-                // Show extracted data info
-                const count = Object.keys(filledData).length;
-                if (count > 0) {
+                // Count actual unique fields (not variations)
+                const actualCount = countActualFields(data);
+                if (actualCount > 0) {
                     document.getElementById('extractedDataInfo').style.display = 'block';
-                    document.getElementById('extractedDataCount').textContent = count;
+                    document.getElementById('extractedDataCount').textContent = actualCount;
                 }
             }
+        }
+
+        // Count actual unique fields from extracted data
+        function countActualFields(data) {
+            let count = 0;
+            
+            // Count CCCD fields
+            if (data.cccd) {
+                Object.values(data.cccd).forEach(info => {
+                    Object.values(info).forEach(value => {
+                        if (value) count++;
+                    });
+                });
+            }
+            
+            // Count other document fields
+            if (data.other) {
+                Object.values(data.other).forEach(info => {
+                    Object.values(info).forEach(value => {
+                        if (value) count++;
+                    });
+                });
+            }
+            
+            return count;
+        }
+
+        // Show modal with extracted data details
+        function showExtractedDataModal() {
+            const modalBody = document.getElementById('extractedDataModalBody');
+            let html = '';
+            
+            // Field labels in Vietnamese
+            const fieldLabels = {
+                fullname: 'Họ và tên',
+                birthday: 'Ngày sinh',
+                idcard: 'Số CMND/CCCD',
+                issue_date: 'Ngày cấp',
+                expiry_date: 'Ngày hết hạn',
+                address: 'Địa chỉ',
+                phone: 'Số điện thoại',
+                email: 'Email'
+            };
+            
+            // Display CCCD data
+            if (extractedData.cccd) {
+                Object.entries(extractedData.cccd).forEach(([party, info]) => {
+                    html += `<div class="mb-4">
+                        <div class="party-header">
+                            <i class="bi bi-person-badge me-2"></i>Thông tin Đương sự ${party}
+                        </div>
+                        <table class="table table-sm extracted-info-table mb-0">`;
+                    
+                    Object.entries(info).forEach(([key, value]) => {
+                        if (value) {
+                            const label = fieldLabels[key] || key;
+                            html += `<tr>
+                                <td class="text-muted" style="width: 40%">${label}</td>
+                                <td><strong>${value}</strong></td>
+                            </tr>`;
+                        }
+                    });
+                    
+                    html += `</table></div>`;
+                });
+            }
+            
+            // Display other document data
+            if (extractedData.other && Object.keys(extractedData.other).length > 0) {
+                Object.entries(extractedData.other).forEach(([party, info]) => {
+                    html += `<div class="mb-4">
+                        <div class="party-header">
+                            <i class="bi bi-file-text me-2"></i>Giấy tờ khác - Đương sự ${party}
+                        </div>
+                        <table class="table table-sm extracted-info-table mb-0">`;
+                    
+                    Object.entries(info).forEach(([key, value]) => {
+                        if (value) {
+                            html += `<tr>
+                                <td class="text-muted" style="width: 40%">${key}</td>
+                                <td><strong>${value}</strong></td>
+                            </tr>`;
+                        }
+                    });
+                    
+                    html += `</table></div>`;
+                });
+            }
+            
+            if (!html) {
+                html = '<p class="text-muted text-center">Chưa có thông tin nào được trích xuất</p>';
+            }
+            
+            modalBody.innerHTML = html;
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('extractedDataModal'));
+            modal.show();
         }
 
         function flattenExtractedData(data) {
