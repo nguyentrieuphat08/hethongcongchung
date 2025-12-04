@@ -7,9 +7,17 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
+        body {
+            background-color: #f8f9fa;
+        }
         .sidebar {
             background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 200px;
+            z-index: 100;
         }
         .nav-link.active {
             background-color: rgba(255,255,255,0.2);
@@ -20,11 +28,18 @@
             border-radius: 8px;
         }
         .main-content {
-            background-color: #f8f9fa;
-            min-height: 100vh;
+            margin-left: 200px;
+            padding: 20px;
+        }
+        .chat-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
         }
         .chat-container {
-            height: 400px;
+            height: 250px;
             overflow-y: auto;
             border: 1px solid #dee2e6;
             border-radius: 8px;
@@ -32,10 +47,10 @@
             background-color: #f8f9fa;
         }
         .message {
-            margin-bottom: 15px;
-            padding: 12px 16px;
+            margin-bottom: 12px;
+            padding: 10px 14px;
             border-radius: 12px;
-            max-width: 85%;
+            max-width: 80%;
         }
         .message.user {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -46,53 +61,53 @@
             background-color: white;
             border: 1px solid #e9ecef;
         }
+        .contract-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
         .contract-card {
             border: 2px solid #e9ecef;
             border-radius: 12px;
             padding: 15px;
             margin: 10px 0;
-            cursor: pointer;
             transition: all 0.3s;
+            background: white;
         }
         .contract-card:hover {
             border-color: #667eea;
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
         }
-        .contract-card.selected {
-            border-color: #667eea;
-            background-color: #f0f4ff;
+        .contract-card.suggested {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
         }
         .extracted-data-badge {
             background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 20px;
-            font-size: 14px;
-        }
-        .missing-field {
-            border-color: #ffc107 !important;
-            background-color: #fff8e1;
-        }
-        .field-filled {
-            border-color: #28a745 !important;
-            background-color: #e8f5e9;
-        }
-        .placeholder-inline {
-            display: inline-flex;
-            align-items: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2px 10px;
-            border-radius: 4px;
             font-size: 13px;
-            margin: 0 2px;
         }
-        .placeholder-inline.filled {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        .transaction-select {
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%);
         }
-        .placeholder-inline.missing {
-            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
-            color: #333;
+        .transaction-select:focus {
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+        }
+        .contract-preview-full {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 30px;
+            min-height: 500px;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
         }
         .typing-indicator {
             display: flex;
@@ -112,208 +127,213 @@
             0%, 100% { opacity: 0.3; transform: scale(0.8); }
             50% { opacity: 1; transform: scale(1); }
         }
-        .contract-preview {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            max-height: calc(100vh - 350px);
-            min-height: 400px;
-            overflow-y: auto;
+        .btn-preview {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            border: none;
+            color: white;
         }
-        .transaction-select {
-            border: 2px solid #667eea;
-            border-radius: 10px;
-            padding: 10px 15px;
-            font-size: 14px;
-            background: linear-gradient(135deg, #f8f9ff 0%, #e8ecff 100%);
+        .btn-preview:hover {
+            background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+            color: white;
         }
-        .transaction-select:focus {
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
-            border-color: #764ba2;
+        .btn-use-template {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+            color: white;
+            font-size: 18px;
+            padding: 12px 30px;
+        }
+        .btn-use-template:hover {
+            background: linear-gradient(135deg, #218838 0%, #1aa179 100%);
+            color: white;
+        }
+        .missing-field {
+            border-color: #ffc107 !important;
+            background-color: #fff8e1;
+        }
+        .field-filled {
+            border-color: #28a745 !important;
+            background-color: #e8f5e9;
+        }
+        .contracts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <div class="col-md-2 sidebar text-white p-0">
-                <div class="p-3">
-                    <h4 class="mb-4">MENU</h4>
-                    <div class="nav flex-column" id="mainMenu">
-                        <a href="admin-contract.html" class="nav-link text-white mb-2">
-                            <i class="bi bi-gear-fill me-2"></i>Quản lý Mẫu Hợp đồng
-                        </a>
-                        <a href="user-extract.html" class="nav-link text-white mb-2">
-                            <i class="bi bi-card-image me-2"></i>Trích xuất thông tin
-                        </a>
-                        <a href="user-chat.html" class="nav-link text-white active mb-2">
-                            <i class="bi bi-chat-dots-fill me-2"></i>Chat AI
-                        </a>
+    <!-- Sidebar -->
+    <div class="sidebar text-white p-3">
+        <h4 class="mb-4">MENU</h4>
+        <div class="nav flex-column">
+            <a href="admin-contract.html" class="nav-link text-white mb-2">
+                <i class="bi bi-gear-fill me-2"></i>Quản lý Mẫu Hợp đồng
+            </a>
+            <a href="user-extract.html" class="nav-link text-white mb-2">
+                <i class="bi bi-card-image me-2"></i>Trích xuất thông tin
+            </a>
+            <a href="user-chat.html" class="nav-link text-white active mb-2">
+                <i class="bi bi-chat-dots-fill me-2"></i>Chat AI
+            </a>
+        </div>
+        <div class="mt-4 text-center">
+            <small>Phiên bản 1.0</small>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Chat Section (Top) -->
+        <div class="chat-section">
+            <div class="row align-items-center mb-3">
+                <div class="col-md-4">
+                    <h5 class="mb-0">
+                        <i class="bi bi-robot me-2"></i>Chat AI - Tạo Hợp đồng
+                    </h5>
+                </div>
+                <div class="col-md-5">
+                    <select class="form-select transaction-select" id="transactionType" onchange="onTransactionTypeChange()">
+                        <option value="">— Chọn loại giao dịch —</option>
+                        <option value="gd01">1. Văn bản lựa chọn người giám hộ</option>
+                        <option value="gd02">2. Văn bản tặng cho bất động sản</option>
+                        <option value="gd03">3. Di chúc của người hạn chế thể chất / không biết chữ</option>
+                        <option value="gd04">4. Văn bản ủy quyền đại diện kháng cáo vụ việc dân sự</option>
+                        <option value="gd05">5. HĐ mua bán / thuê mua nhà ở, công trình (giữa cá nhân)</option>
+                        <option value="gd06">6. HĐ giao dịch nhà ở (mua bán, thuê mua, tặng cho, đổi, góp vốn, thế chấp)</option>
+                        <option value="gd07">7. Văn bản thừa kế nhà ở</option>
+                        <option value="gd08">8. HĐ chuyển nhượng / tặng cho / thế chấp / góp vốn QSDĐ</option>
+                        <option value="gd09">9. Văn bản về thừa kế QSDĐ, tài sản gắn liền</option>
+                        <option value="gd10">10. Giấy tờ mua bán / tặng cho / đổi / thừa kế nhà ở trước 01/7/2006</option>
+                        <option value="gd11">11. HĐ thuê đất / góp vốn / hợp tác xây dựng nhà ở</option>
+                        <option value="gd12">12. HĐ thuê đất / góp vốn / hợp tác xây dựng công trình</option>
+                        <option value="gd13">13. Văn bản thỏa thuận tài sản vợ chồng trước khi kết hôn</option>
+                        <option value="gd14">14. Văn bản thỏa thuận về việc mang thai hộ</option>
+                        <option value="gd15">15. Văn bản sửa đổi thỏa thuận tài sản vợ chồng</option>
+                        <option value="gd16">16. Hợp đồng cho thuê doanh nghiệp tư nhân</option>
+                        <option value="gd17">17. Văn bản ủy quyền kháng cáo vụ việc hành chính</option>
+                        <option value="gd18">18. Văn bản ủy quyền mua nhà ở cũ thuộc tài sản công</option>
+                        <option value="gd19">19. Hợp đồng chuyển nhượng kinh doanh bất động sản</option>
+                        <option value="gd20">20. Văn bản thỏa thuận đưa QSDĐ vào doanh nghiệp</option>
+                        <option value="gd21">21. Văn bản ủy quyền thi hành án khi xuất cảnh</option>
+                        <option value="gd22">22. Văn bản ủy quyền thực hiện quyền khiếu nại</option>
+                        <option value="gd23">23. Hợp đồng chuyển nhượng Văn phòng Thừa phát lại</option>
+                        <option value="gd24">24. Các giao dịch khác</option>
+                    </select>
+                </div>
+                <div class="col-md-3 text-end">
+                    <span id="extractedDataInfo" class="extracted-data-badge" style="display: none;">
+                        <i class="bi bi-check-circle me-1"></i>
+                        <span id="extractedDataCount">0</span> thông tin đã trích xuất
+                    </span>
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="clearChat()">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="chat-container mb-3" id="chatContainer">
+                <!-- Messages will be added here -->
+            </div>
+
+            <div class="input-group">
+                <input type="text" 
+                       class="form-control" 
+                       id="chatInput" 
+                       placeholder="Mô tả nhu cầu của bạn... (VD: Tôi muốn cho thuê căn hộ 50m2 tại quận 1)"
+                       onkeypress="handleKeyPress(event)">
+                <button class="btn btn-primary" onclick="sendMessage()" id="sendBtn">
+                    <i class="bi bi-send-fill me-1"></i> Gửi
+                </button>
+            </div>
+        </div>
+
+        <!-- Contract Section (Bottom) -->
+        <div class="contract-section">
+            <!-- Contract List with Preview Buttons -->
+            <div id="contractListSection">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-file-earmark-text me-2"></i>Mẫu hợp đồng
+                    </h5>
+                    <button class="btn btn-outline-primary btn-sm" onclick="showAvailableContracts()">
+                        <i class="bi bi-list-ul me-1"></i>Xem tất cả mẫu
+                    </button>
+                </div>
+                
+                <div id="contractsContainer">
+                    <div class="text-center text-muted py-4" id="defaultContractState">
+                        <i class="bi bi-chat-left-text" style="font-size: 40px;"></i>
+                        <p class="mt-2 mb-0">Chat với AI để được gợi ý mẫu hợp đồng phù hợp</p>
                     </div>
-                    <div class="mt-4 text-center">
-                        <small>Phiên bản 1.0</small>
+                    <div id="contractsList" class="contracts-grid"></div>
+                </div>
+            </div>
+
+            <!-- Full Contract Preview -->
+            <div id="contractPreviewFull" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <button class="btn btn-outline-secondary btn-sm me-2" onclick="backToContractList()">
+                            <i class="bi bi-arrow-left me-1"></i>Quay lại
+                        </button>
+                        <span class="badge bg-info fs-6">Xem trước mẫu hợp đồng</span>
+                    </div>
+                    <h5 id="previewContractName" class="text-primary mb-0"></h5>
+                </div>
+                <div class="contract-preview-full mb-3" id="contractPreviewContent"></div>
+                <div class="text-center">
+                    <button class="btn btn-use-template" onclick="confirmSelectContract()">
+                        <i class="bi bi-check-circle me-2"></i>Dùng mẫu này
+                    </button>
+                </div>
+            </div>
+
+            <!-- Missing Fields Form -->
+            <div id="missingFieldsSection" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <button class="btn btn-outline-secondary btn-sm me-2" onclick="backToPreview()">
+                            <i class="bi bi-arrow-left me-1"></i>Quay lại
+                        </button>
+                        <span class="badge bg-warning text-dark fs-6">Điền thông tin vào hợp đồng</span>
+                    </div>
+                    <h5 id="selectedContractName" class="text-primary mb-0"></h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Vui lòng điền các thông tin còn thiếu để hoàn thành hợp đồng
+                        </div>
+                        <div id="missingFieldsList"></div>
+                        <button class="btn btn-primary w-100 mt-3" onclick="submitMissingFields()">
+                            <i class="bi bi-check-lg me-2"></i>Hoàn thành và tạo hợp đồng
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-2">Xem trước hợp đồng:</h6>
+                        <div class="contract-preview-full" id="contractPreviewWhileFilling" style="max-height: 400px;"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Main Content -->
-            <div class="col-md-10 p-4 main-content">
-                <div class="row">
-                    <!-- Chat Section -->
-                    <div class="col-md-6">
-                        <div class="bg-white rounded shadow-sm p-4 h-100">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="mb-0">
-                                    <i class="bi bi-robot me-2"></i>Chat AI - Tạo Hợp đồng
-                                </h5>
-                                <button class="btn btn-sm btn-outline-danger" onclick="clearChat()">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                            
-                            <!-- Transaction Type Selector -->
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">
-                                    <i class="bi bi-tag-fill me-2 text-primary"></i>Chọn loại giao dịch:
-                                </label>
-                                <select class="form-select transaction-select" id="transactionType" onchange="onTransactionTypeChange()">
-                                    <option value="">— Chọn loại giao dịch —</option>
-                                    <option value="gd01">1. Văn bản lựa chọn người giám hộ</option>
-                                    <option value="gd02">2. Văn bản tặng cho bất động sản</option>
-                                    <option value="gd03">3. Di chúc của người hạn chế thể chất / không biết chữ</option>
-                                    <option value="gd04">4. Văn bản ủy quyền đại diện kháng cáo vụ việc dân sự</option>
-                                    <option value="gd05">5. HĐ mua bán / thuê mua nhà ở, công trình (giữa cá nhân)</option>
-                                    <option value="gd06">6. HĐ giao dịch nhà ở (mua bán, thuê mua, tặng cho, đổi, góp vốn, thế chấp)</option>
-                                    <option value="gd07">7. Văn bản thừa kế nhà ở</option>
-                                    <option value="gd08">8. HĐ chuyển nhượng / tặng cho / thế chấp / góp vốn QSDĐ và tài sản gắn liền</option>
-                                    <option value="gd09">9. Văn bản về thừa kế QSDĐ, QSDĐ và tài sản gắn liền</option>
-                                    <option value="gd10">10. Giấy tờ mua bán / tặng cho / đổi / thừa kế nhà ở trước 01/7/2006</option>
-                                    <option value="gd11">11. HĐ thuê đất / góp vốn / hợp tác hoặc văn bản đồng ý xây dựng nhà ở</option>
-                                    <option value="gd12">12. HĐ thuê đất / góp vốn / hợp tác hoặc văn bản đồng ý xây dựng công trình</option>
-                                    <option value="gd13">13. Văn bản thỏa thuận chế độ tài sản vợ chồng trước khi kết hôn</option>
-                                    <option value="gd14">14. Văn bản thỏa thuận về việc mang thai hộ</option>
-                                    <option value="gd15">15. Văn bản sửa đổi, bổ sung thỏa thuận về chế độ tài sản của vợ chồng</option>
-                                    <option value="gd16">16. Hợp đồng cho thuê doanh nghiệp tư nhân</option>
-                                    <option value="gd17">17. Văn bản ủy quyền đại diện kháng cáo bản án, quyết định của tòa án cấp sơ thẩm trong vụ việc hành chính</option>
-                                    <option value="gd18">18. Văn bản ủy quyền của người có tên trong HĐ thuê nhà ở đã xuất cảnh cho thành viên khác đứng tên mua nhà ở cũ thuộc tài sản công</option>
-                                    <option value="gd19">19. Hợp đồng chuyển nhượng hợp đồng kinh doanh bất động sản</option>
-                                    <option value="gd20">20. Văn bản thỏa thuận của các thành viên có chung QSDĐ đồng ý đưa QSDĐ vào doanh nghiệp</option>
-                                    <option value="gd21">21. Văn bản ủy quyền giải quyết việc thi hành án liên quan đến tài sản khi người phải thi hành án xuất cảnh</option>
-                                    <option value="gd22">22. Văn bản ủy quyền thực hiện quyền khiếu nại</option>
-                                    <option value="gd23">23. Hợp đồng chuyển nhượng Văn phòng Thừa phát lại</option>
-                                    <option value="gd24">24. Các giao dịch khác theo quy định của luật và nghị định</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Extracted Data Info -->
-                            <div id="extractedDataInfo" class="mb-3" style="display: none;">
-                                <div class="extracted-data-badge">
-                                    <i class="bi bi-check-circle me-2"></i>
-                                    <span id="extractedDataCount">0</span> thông tin đã được trích xuất
-                                </div>
-                            </div>
-                            
-                            <div class="chat-container mb-3" id="chatContainer">
-                                <!-- Messages will be added here -->
-                            </div>
-
-                            <div class="input-group">
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="chatInput" 
-                                       placeholder="Nhập tin nhắn... (VD: Tôi cần tạo hợp đồng thuê nhà)"
-                                       onkeypress="handleKeyPress(event)">
-                                <button class="btn btn-primary" onclick="sendMessage()" id="sendBtn">
-                                    <i class="bi bi-send-fill"></i>
-                                </button>
-                            </div>
-                            
-                            <div class="mt-2">
-                                <small class="text-muted">
-                                    💡 Chọn loại giao dịch và mô tả nhu cầu của bạn để được tư vấn pháp lý
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Contract Preview Section -->
-                    <div class="col-md-6">
-                        <div class="bg-white rounded shadow-sm p-4 h-100">
-                            <h5 class="mb-3">
-                                <i class="bi bi-file-earmark-text me-2"></i>Hợp đồng
-                            </h5>
-                            
-                            <!-- Contract Selection -->
-                            <div id="contractSelection" style="display: none;">
-                                <p class="text-muted mb-3">Chọn mẫu hợp đồng bạn muốn xem trước:</p>
-                                <div id="contractsList"></div>
-                            </div>
-                            
-                            <!-- Contract Preview Before Selecting -->
-                            <div id="contractPreviewBeforeSelect" style="display: none;">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="badge bg-info">Xem trước hợp đồng</span>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="backToContractList()">
-                                        <i class="bi bi-arrow-left me-1"></i>Quay lại
-                                    </button>
-                                </div>
-                                <h6 id="previewContractName" class="text-primary mb-3"></h6>
-                                <div class="contract-preview mb-3" id="contractPreviewContent" style="max-height: calc(100vh - 400px); min-height: 300px;"></div>
-                                <button class="btn btn-success w-100" onclick="confirmSelectContract()">
-                                    <i class="bi bi-check-circle me-2"></i>Chọn hợp đồng này
-                                </button>
-                            </div>
-                            
-                            <!-- Missing Fields Form -->
-                            <div id="missingFieldsForm" style="display: none;">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="badge bg-warning text-dark">Điền thông tin</span>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="backToPreview()">
-                                        <i class="bi bi-arrow-left me-1"></i>Quay lại
-                                    </button>
-                                </div>
-                                <div class="alert alert-warning">
-                                    <i class="bi bi-exclamation-triangle me-2"></i>
-                                    <strong>Bổ sung thông tin!</strong> Vui lòng điền các thông tin còn thiếu:
-                                </div>
-                                <div id="missingFieldsList"></div>
-                                <button class="btn btn-primary w-100 mt-3" onclick="submitMissingFields()">
-                                    <i class="bi bi-check-lg me-2"></i>Hoàn thành và tạo hợp đồng
-                                </button>
-                            </div>
-                            
-                            <!-- Contract Preview (Final) -->
-                            <div id="contractPreviewSection" style="display: none;">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="badge bg-success">Hợp đồng đã hoàn thành</span>
-                                    <div>
-                                        <button class="btn btn-sm btn-outline-primary me-2" onclick="downloadContract()">
-                                            <i class="bi bi-download me-2"></i>Tải Word
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-secondary" onclick="printContract()">
-                                            <i class="bi bi-printer me-2"></i>In
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="contract-preview" id="contractPreview"></div>
-                            </div>
-                            
-                            <!-- Default State -->
-                            <div id="defaultState">
-                                <div class="text-center text-muted py-5">
-                                    <i class="bi bi-chat-left-text" style="font-size: 48px;"></i>
-                                    <p class="mt-3">Hãy chat với AI để bắt đầu tạo hợp đồng</p>
-                                    <p class="small">Hoặc nhấn nút bên dưới để xem các hợp đồng có sẵn</p>
-                                    <button class="btn btn-outline-primary" onclick="showAvailableContracts()">
-                                        <i class="bi bi-list-ul me-2"></i>Xem danh sách hợp đồng
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+            <!-- Final Contract -->
+            <div id="contractFinalSection" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="badge bg-success fs-6">
+                        <i class="bi bi-check-circle me-1"></i>Hợp đồng đã hoàn thành
+                    </span>
+                    <div>
+                        <button class="btn btn-primary me-2" onclick="downloadContract()">
+                            <i class="bi bi-download me-2"></i>Tải xuống Word
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="printContract()">
+                            <i class="bi bi-printer me-2"></i>In hợp đồng
+                        </button>
                     </div>
                 </div>
+                <div class="contract-preview-full" id="contractFinalPreview"></div>
             </div>
         </div>
     </div>
@@ -330,7 +350,7 @@
         let extractedData = {};
         let availableContracts = [];
         let selectedContract = null;
-        let previewingContract = null; // Contract being previewed before selection
+        let previewingContract = null;
         let filledData = {};
         let missingFields = [];
         let chatHistory = [];
@@ -339,13 +359,9 @@
 
         // ========== INITIALIZATION ==========
         window.addEventListener('load', async () => {
-            // Load extracted data from sessionStorage
             loadExtractedData();
-            
-            // Load available contracts from database
             await loadAvailableContracts();
             
-            // Check if coming from extract page
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('fromExtract') === 'true') {
                 // Show welcome message with extracted data
@@ -708,44 +724,28 @@ Nếu không có mẫu phù hợp, trả về suggestions rỗng và gợi ý li
 
         // Show AI suggested contracts with reasons
         function showSuggestedContracts(contracts) {
-            hideAllSections();
-            document.getElementById('contractSelection').style.display = 'block';
-            
+            document.getElementById('defaultContractState').style.display = 'none';
             const container = document.getElementById('contractsList');
-            container.innerHTML = '<p class="text-success mb-3"><i class="bi bi-stars me-2"></i><strong>AI gợi ý các mẫu phù hợp (click để xem trước):</strong></p>';
+            container.innerHTML = '';
             
             contracts.forEach((contract) => {
                 const card = document.createElement('div');
-                card.className = 'contract-card';
-                card.style.borderColor = '#28a745';
-                card.style.background = 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)';
-                card.onclick = () => previewContract(contract.id);
+                card.className = 'contract-card suggested';
                 card.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start">
-                        <div>
+                        <div class="flex-grow-1">
                             <h6 class="mb-1 text-success">
-                                <i class="bi bi-check-circle-fill me-2"></i>${contract.name}
+                                <i class="bi bi-star-fill me-2"></i>${contract.name}
                             </h6>
-                            <p class="mb-1 small text-muted">${contract.reason || ''}</p>
-                            <small class="text-muted">
-                                <i class="bi bi-file-earmark me-1"></i>${contract.file_type === 'word' ? 'Word' : 'PDF'}
-                            </small>
+                            <p class="mb-2 small text-muted">${contract.reason || 'Phù hợp với yêu cầu của bạn'}</p>
                         </div>
-                        <div class="text-end">
-                            <i class="bi bi-eye text-success me-2" title="Xem trước"></i>
-                            <i class="bi bi-arrow-right-circle-fill text-success" style="font-size: 24px;"></i>
-                        </div>
+                        <button class="btn btn-preview btn-sm" onclick="previewContract(${contract.id})">
+                            <i class="bi bi-eye me-1"></i>Xem trước
+                        </button>
                     </div>
                 `;
                 container.appendChild(card);
             });
-            
-            // Add button to see all
-            const allBtn = document.createElement('button');
-            allBtn.className = 'btn btn-outline-secondary w-100 mt-3';
-            allBtn.innerHTML = '<i class="bi bi-list-ul me-2"></i>Xem tất cả mẫu hợp đồng';
-            allBtn.onclick = () => showAvailableContracts();
-            container.appendChild(allBtn);
         }
 
         function findMatchingContracts(query) {
@@ -778,34 +778,30 @@ Bạn có muốn sử dụng mẫu này không?`);
                 return;
             }
             
-            addBotMessage(`📂 Có ${availableContracts.length} mẫu hợp đồng trong hệ thống. Vui lòng chọn một mẫu bên phải.`);
+            addBotMessage(`📂 Có ${availableContracts.length} mẫu hợp đồng trong hệ thống. Chọn mẫu để xem trước.`);
             showContractSelection(availableContracts);
         }
 
         function showContractSelection(contracts) {
-            hideAllSections();
-            document.getElementById('contractSelection').style.display = 'block';
-            
+            document.getElementById('defaultContractState').style.display = 'none';
             const container = document.getElementById('contractsList');
             container.innerHTML = '';
             
-            contracts.forEach((contract, index) => {
+            contracts.forEach((contract) => {
                 const card = document.createElement('div');
                 card.className = 'contract-card';
-                card.onclick = () => previewContract(contract.id);
                 card.innerHTML = `
                     <div class="d-flex justify-content-between align-items-center">
-                        <div>
+                        <div class="flex-grow-1">
                             <h6 class="mb-1">${contract.name}</h6>
                             <small class="text-muted">
                                 <i class="bi bi-file-earmark me-1"></i>${contract.file_type === 'word' ? 'Word' : 'PDF'}
                                 <span class="ms-2"><i class="bi bi-calendar me-1"></i>${formatDate(contract.created_at)}</span>
                             </small>
                         </div>
-                        <div class="text-end">
-                            <i class="bi bi-eye text-primary me-2" title="Xem trước"></i>
-                            <i class="bi bi-chevron-right text-muted"></i>
-                        </div>
+                        <button class="btn btn-preview btn-sm" onclick="previewContract(${contract.id})">
+                            <i class="bi bi-eye me-1"></i>Xem trước
+                        </button>
                     </div>
                 `;
                 container.appendChild(card);
@@ -826,20 +822,18 @@ Bạn có muốn sử dụng mẫu này không?`);
                 
                 previewingContract = contract;
                 
-                // Show preview section
-                hideAllSections();
-                document.getElementById('contractPreviewBeforeSelect').style.display = 'block';
+                // Hide contract list, show preview
+                document.getElementById('contractListSection').style.display = 'none';
+                document.getElementById('contractPreviewFull').style.display = 'block';
                 
-                // Set contract name
+                // Set contract name and content
                 document.getElementById('previewContractName').textContent = contract.name;
-                
-                // Show contract content
                 const content = contract.modified_content || contract.template || '<p class="text-muted">Không có nội dung</p>';
                 document.getElementById('contractPreviewContent').innerHTML = content;
                 
                 addBotMessage(`📄 Đang xem trước: **${contract.name}**
 
-Xem nội dung hợp đồng bên phải. Nếu phù hợp, nhấn **"Chọn hợp đồng này"** để tiếp tục điền thông tin.`);
+Xem nội dung hợp đồng bên dưới. Nếu phù hợp, nhấn **"Dùng mẫu này"** để tiếp tục.`);
                 
             } catch (error) {
                 console.error('Error loading contract:', error);
@@ -850,8 +844,10 @@ Xem nội dung hợp đồng bên phải. Nếu phù hợp, nhấn **"Chọn h�
         // Back to contract list from preview
         function backToContractList() {
             previewingContract = null;
-            hideAllSections();
-            document.getElementById('contractSelection').style.display = 'block';
+            document.getElementById('contractPreviewFull').style.display = 'none';
+            document.getElementById('missingFieldsSection').style.display = 'none';
+            document.getElementById('contractFinalSection').style.display = 'none';
+            document.getElementById('contractListSection').style.display = 'block';
             addBotMessage('Quay lại danh sách hợp đồng. Chọn mẫu bạn muốn xem.');
         }
 
@@ -889,7 +885,7 @@ Xem nội dung hợp đồng bên phải. Nếu phù hợp, nhấn **"Chọn h�
                 addBotMessage(`✅ Đã chọn hợp đồng: **${selectedContract.name}**
 
 ⚠️ Có **${missingFields.length} thông tin** còn thiếu cần bổ sung.
-Vui lòng điền vào form bên phải.`);
+Vui lòng điền vào form bên dưới.`);
                 showMissingFieldsForm();
             } else {
                 addBotMessage(`✅ Đã chọn hợp đồng: **${selectedContract.name}**
@@ -905,8 +901,8 @@ Vui lòng điền vào form bên phải.`);
                 previewingContract = selectedContract;
                 selectedContract = null;
                 
-                hideAllSections();
-                document.getElementById('contractPreviewBeforeSelect').style.display = 'block';
+                document.getElementById('missingFieldsSection').style.display = 'none';
+                document.getElementById('contractPreviewFull').style.display = 'block';
                 document.getElementById('previewContractName').textContent = previewingContract.name;
                 
                 const content = previewingContract.modified_content || previewingContract.template || '';
@@ -914,17 +910,7 @@ Vui lòng điền vào form bên phải.`);
             }
         }
 
-        // Hide all sections helper
-        function hideAllSections() {
-            document.getElementById('defaultState').style.display = 'none';
-            document.getElementById('contractSelection').style.display = 'none';
-            document.getElementById('contractPreviewBeforeSelect').style.display = 'none';
-            document.getElementById('missingFieldsForm').style.display = 'none';
-            document.getElementById('contractPreviewSection').style.display = 'none';
-        }
-
         async function selectContract(contractId) {
-            // This now just calls previewContract
             await previewContract(contractId);
         }
 
@@ -934,8 +920,6 @@ Vui lòng điền vào form bên phải.`);
             placeholders.forEach(placeholder => {
                 const field = placeholder.field;
                 const label = placeholder.label || field;
-                
-                // Check if we have data for this field using the same logic as generateContract
                 const value = getValueForField(field);
                 
                 if (!value) {
@@ -951,8 +935,13 @@ Vui lòng điền vào form bên phải.`);
         }
 
         function showMissingFieldsForm() {
-            hideAllSections();
-            document.getElementById('missingFieldsForm').style.display = 'block';
+            document.getElementById('contractPreviewFull').style.display = 'none';
+            document.getElementById('missingFieldsSection').style.display = 'block';
+            document.getElementById('selectedContractName').textContent = selectedContract.name;
+            
+            // Show contract preview while filling
+            const content = selectedContract.modified_content || selectedContract.template || '';
+            document.getElementById('contractPreviewWhileFilling').innerHTML = content;
             
             const container = document.getElementById('missingFieldsList');
             container.innerHTML = '';
@@ -976,7 +965,6 @@ Vui lòng điền vào form bên phải.`);
         }
 
         function submitMissingFields() {
-            // Collect values from form
             let allFilled = true;
             
             missingFields.forEach(field => {
@@ -1005,10 +993,10 @@ Vui lòng điền vào form bên phải.`);
         function generateContract() {
             if (!selectedContract) return;
             
-            document.getElementById('defaultState').style.display = 'none';
-            document.getElementById('contractSelection').style.display = 'none';
-            document.getElementById('missingFieldsForm').style.display = 'none';
-            document.getElementById('contractPreviewSection').style.display = 'block';
+            document.getElementById('contractListSection').style.display = 'none';
+            document.getElementById('contractPreviewFull').style.display = 'none';
+            document.getElementById('missingFieldsSection').style.display = 'none';
+            document.getElementById('contractFinalSection').style.display = 'block';
             
             let content = selectedContract.modified_content || selectedContract.template || '';
             
@@ -1042,16 +1030,11 @@ Vui lòng điền vào form bên phải.`);
                 return `[${field.trim()}]`;
             });
             
-            document.getElementById('contractPreview').innerHTML = content || '<p class="text-muted">Không có nội dung hợp đồng</p>';
+            document.getElementById('contractFinalPreview').innerHTML = content || '<p class="text-muted">Không có nội dung hợp đồng</p>';
             
             addBotMessage(`🎉 Hợp đồng **${selectedContract.name}** đã được tạo thành công!
 
-Bạn có thể:
-• Xem trước bên phải
-• Tải xuống file Word
-• In trực tiếp
-
-Cần tôi giúp gì thêm không?`);
+Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
         }
 
         // Get value for a specific field from extracted data
@@ -1175,7 +1158,7 @@ Cần tôi giúp gì thêm không?`);
         function downloadContract() {
             if (!selectedContract) return;
             
-            const content = document.getElementById('contractPreview').innerHTML;
+            const content = document.getElementById('contractFinalPreview').innerHTML;
             
             // Create HTML document
             const html = `
@@ -1205,7 +1188,7 @@ Cần tôi giúp gì thêm không?`);
         }
 
         function printContract() {
-            const content = document.getElementById('contractPreview').innerHTML;
+            const content = document.getElementById('contractFinalPreview').innerHTML;
             
             const printWindow = window.open('', '', 'height=800,width=600');
             printWindow.document.write(`
