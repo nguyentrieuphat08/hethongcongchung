@@ -246,23 +246,44 @@
                             
                             <!-- Contract Selection -->
                             <div id="contractSelection" style="display: none;">
-                                <p class="text-muted mb-3">Chọn mẫu hợp đồng bạn muốn sử dụng:</p>
+                                <p class="text-muted mb-3">Chọn mẫu hợp đồng bạn muốn xem trước:</p>
                                 <div id="contractsList"></div>
+                            </div>
+                            
+                            <!-- Contract Preview Before Selecting -->
+                            <div id="contractPreviewBeforeSelect" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-info">Xem trước hợp đồng</span>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="backToContractList()">
+                                        <i class="bi bi-arrow-left me-1"></i>Quay lại
+                                    </button>
+                                </div>
+                                <h6 id="previewContractName" class="text-primary mb-3"></h6>
+                                <div class="contract-preview mb-3" id="contractPreviewContent" style="max-height: 350px;"></div>
+                                <button class="btn btn-success w-100" onclick="confirmSelectContract()">
+                                    <i class="bi bi-check-circle me-2"></i>Chọn hợp đồng này
+                                </button>
                             </div>
                             
                             <!-- Missing Fields Form -->
                             <div id="missingFieldsForm" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-warning text-dark">Điền thông tin</span>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="backToPreview()">
+                                        <i class="bi bi-arrow-left me-1"></i>Quay lại
+                                    </button>
+                                </div>
                                 <div class="alert alert-warning">
                                     <i class="bi bi-exclamation-triangle me-2"></i>
-                                    <strong>Thiếu thông tin!</strong> Vui lòng bổ sung các thông tin sau:
+                                    <strong>Bổ sung thông tin!</strong> Vui lòng điền các thông tin còn thiếu:
                                 </div>
                                 <div id="missingFieldsList"></div>
                                 <button class="btn btn-primary w-100 mt-3" onclick="submitMissingFields()">
-                                    <i class="bi bi-check-lg me-2"></i>Hoàn thành
+                                    <i class="bi bi-check-lg me-2"></i>Hoàn thành và tạo hợp đồng
                                 </button>
                             </div>
                             
-                            <!-- Contract Preview -->
+                            <!-- Contract Preview (Final) -->
                             <div id="contractPreviewSection" style="display: none;">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <span class="badge bg-success">Hợp đồng đã hoàn thành</span>
@@ -308,6 +329,7 @@
         let extractedData = {};
         let availableContracts = [];
         let selectedContract = null;
+        let previewingContract = null; // Contract being previewed before selection
         let filledData = {};
         let missingFields = [];
         let chatHistory = [];
@@ -685,20 +707,18 @@ Nếu không có mẫu phù hợp, trả về suggestions rỗng và gợi ý li
 
         // Show AI suggested contracts with reasons
         function showSuggestedContracts(contracts) {
-            document.getElementById('defaultState').style.display = 'none';
+            hideAllSections();
             document.getElementById('contractSelection').style.display = 'block';
-            document.getElementById('missingFieldsForm').style.display = 'none';
-            document.getElementById('contractPreviewSection').style.display = 'none';
             
             const container = document.getElementById('contractsList');
-            container.innerHTML = '<p class="text-success mb-3"><i class="bi bi-stars me-2"></i><strong>AI gợi ý các mẫu phù hợp:</strong></p>';
+            container.innerHTML = '<p class="text-success mb-3"><i class="bi bi-stars me-2"></i><strong>AI gợi ý các mẫu phù hợp (click để xem trước):</strong></p>';
             
             contracts.forEach((contract) => {
                 const card = document.createElement('div');
                 card.className = 'contract-card';
                 card.style.borderColor = '#28a745';
                 card.style.background = 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)';
-                card.onclick = () => selectContract(contract.id);
+                card.onclick = () => previewContract(contract.id);
                 card.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -710,7 +730,10 @@ Nếu không có mẫu phù hợp, trả về suggestions rỗng và gợi ý li
                                 <i class="bi bi-file-earmark me-1"></i>${contract.file_type === 'word' ? 'Word' : 'PDF'}
                             </small>
                         </div>
-                        <i class="bi bi-arrow-right-circle-fill text-success" style="font-size: 24px;"></i>
+                        <div class="text-end">
+                            <i class="bi bi-eye text-success me-2" title="Xem trước"></i>
+                            <i class="bi bi-arrow-right-circle-fill text-success" style="font-size: 24px;"></i>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
@@ -759,10 +782,8 @@ Bạn có muốn sử dụng mẫu này không?`);
         }
 
         function showContractSelection(contracts) {
-            document.getElementById('defaultState').style.display = 'none';
+            hideAllSections();
             document.getElementById('contractSelection').style.display = 'block';
-            document.getElementById('missingFieldsForm').style.display = 'none';
-            document.getElementById('contractPreviewSection').style.display = 'none';
             
             const container = document.getElementById('contractsList');
             container.innerHTML = '';
@@ -770,7 +791,7 @@ Bạn có muốn sử dụng mẫu này không?`);
             contracts.forEach((contract, index) => {
                 const card = document.createElement('div');
                 card.className = 'contract-card';
-                card.onclick = () => selectContract(contract.id);
+                card.onclick = () => previewContract(contract.id);
                 card.innerHTML = `
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -780,19 +801,21 @@ Bạn có muốn sử dụng mẫu này không?`);
                                 <span class="ms-2"><i class="bi bi-calendar me-1"></i>${formatDate(contract.created_at)}</span>
                             </small>
                         </div>
-                        <i class="bi bi-chevron-right text-muted"></i>
+                        <div class="text-end">
+                            <i class="bi bi-eye text-primary me-2" title="Xem trước"></i>
+                            <i class="bi bi-chevron-right text-muted"></i>
+                        </div>
                     </div>
                 `;
                 container.appendChild(card);
             });
         }
 
-        async function selectContract(contractId) {
-            // Show loading
-            addBotMessage('Đang tải mẫu hợp đồng...');
+        // Preview contract before selecting
+        async function previewContract(contractId) {
+            addBotMessage('Đang tải xem trước hợp đồng...');
             
             try {
-                // Load full contract data
                 const response = await fetch(`${CONTRACTS_DB_API}?id=${contractId}`);
                 const contract = await response.json();
                 
@@ -800,48 +823,108 @@ Bạn có muốn sử dụng mẫu này không?`);
                     throw new Error('Không thể tải hợp đồng');
                 }
                 
-                selectedContract = contract;
+                previewingContract = contract;
                 
-                // Parse placeholder mappings
-                let placeholders = [];
-                if (contract.placeholder_mappings) {
-                    placeholders = typeof contract.placeholder_mappings === 'string' 
-                        ? JSON.parse(contract.placeholder_mappings) 
-                        : contract.placeholder_mappings;
-                }
+                // Show preview section
+                hideAllSections();
+                document.getElementById('contractPreviewBeforeSelect').style.display = 'block';
                 
-                // Also extract from modified_content if available
-                if (contract.modified_content) {
-                    const regex = /data-field="([^"]+)"/g;
-                    let match;
-                    while ((match = regex.exec(contract.modified_content)) !== null) {
-                        const field = match[1];
-                        if (!placeholders.some(p => p.field === field)) {
-                            placeholders.push({ field: field, label: field });
-                        }
-                    }
-                }
+                // Set contract name
+                document.getElementById('previewContractName').textContent = contract.name;
                 
-                // Find missing fields
-                missingFields = findMissingFields(placeholders);
+                // Show contract content
+                const content = contract.modified_content || contract.template || '<p class="text-muted">Không có nội dung</p>';
+                document.getElementById('contractPreviewContent').innerHTML = content;
                 
-                if (missingFields.length > 0) {
-                    addBotMessage(`Đã chọn hợp đồng: **${contract.name}**
+                addBotMessage(`📄 Đang xem trước: **${contract.name}**
 
-⚠️ Có ${missingFields.length} thông tin còn thiếu cần bổ sung.
-Vui lòng điền vào form bên phải.`);
-                    showMissingFieldsForm();
-                } else {
-                    addBotMessage(`Đã chọn hợp đồng: **${contract.name}**
-
-✅ Tất cả thông tin đã đầy đủ! Đang tạo hợp đồng...`);
-                    generateContract();
-                }
+Xem nội dung hợp đồng bên phải. Nếu phù hợp, nhấn **"Chọn hợp đồng này"** để tiếp tục điền thông tin.`);
                 
             } catch (error) {
                 console.error('Error loading contract:', error);
                 addBotMessage('Lỗi khi tải hợp đồng. Vui lòng thử lại.');
             }
+        }
+
+        // Back to contract list from preview
+        function backToContractList() {
+            previewingContract = null;
+            hideAllSections();
+            document.getElementById('contractSelection').style.display = 'block';
+            addBotMessage('Quay lại danh sách hợp đồng. Chọn mẫu bạn muốn xem.');
+        }
+
+        // Confirm select contract after preview
+        async function confirmSelectContract() {
+            if (!previewingContract) return;
+            
+            selectedContract = previewingContract;
+            previewingContract = null;
+            
+            // Parse placeholder mappings
+            let placeholders = [];
+            if (selectedContract.placeholder_mappings) {
+                placeholders = typeof selectedContract.placeholder_mappings === 'string' 
+                    ? JSON.parse(selectedContract.placeholder_mappings) 
+                    : selectedContract.placeholder_mappings;
+            }
+            
+            // Extract from modified_content
+            if (selectedContract.modified_content) {
+                const regex = /data-field="([^"]+)"/g;
+                let match;
+                while ((match = regex.exec(selectedContract.modified_content)) !== null) {
+                    const field = match[1];
+                    if (!placeholders.some(p => p.field === field)) {
+                        placeholders.push({ field: field, label: field });
+                    }
+                }
+            }
+            
+            // Find missing fields
+            missingFields = findMissingFields(placeholders);
+            
+            if (missingFields.length > 0) {
+                addBotMessage(`✅ Đã chọn hợp đồng: **${selectedContract.name}**
+
+⚠️ Có **${missingFields.length} thông tin** còn thiếu cần bổ sung.
+Vui lòng điền vào form bên phải.`);
+                showMissingFieldsForm();
+            } else {
+                addBotMessage(`✅ Đã chọn hợp đồng: **${selectedContract.name}**
+
+🎉 Tất cả thông tin đã đầy đủ! Đang tạo hợp đồng...`);
+                generateContract();
+            }
+        }
+
+        // Back to preview from missing fields form
+        function backToPreview() {
+            if (selectedContract) {
+                previewingContract = selectedContract;
+                selectedContract = null;
+                
+                hideAllSections();
+                document.getElementById('contractPreviewBeforeSelect').style.display = 'block';
+                document.getElementById('previewContractName').textContent = previewingContract.name;
+                
+                const content = previewingContract.modified_content || previewingContract.template || '';
+                document.getElementById('contractPreviewContent').innerHTML = content;
+            }
+        }
+
+        // Hide all sections helper
+        function hideAllSections() {
+            document.getElementById('defaultState').style.display = 'none';
+            document.getElementById('contractSelection').style.display = 'none';
+            document.getElementById('contractPreviewBeforeSelect').style.display = 'none';
+            document.getElementById('missingFieldsForm').style.display = 'none';
+            document.getElementById('contractPreviewSection').style.display = 'none';
+        }
+
+        async function selectContract(contractId) {
+            // This now just calls previewContract
+            await previewContract(contractId);
         }
 
         function findMissingFields(placeholders) {
@@ -867,10 +950,8 @@ Vui lòng điền vào form bên phải.`);
         }
 
         function showMissingFieldsForm() {
-            document.getElementById('defaultState').style.display = 'none';
-            document.getElementById('contractSelection').style.display = 'none';
+            hideAllSections();
             document.getElementById('missingFieldsForm').style.display = 'block';
-            document.getElementById('contractPreviewSection').style.display = 'none';
             
             const container = document.getElementById('missingFieldsList');
             container.innerHTML = '';
@@ -1063,15 +1144,14 @@ Cần tôi giúp gì thêm không?`);
                 document.getElementById('chatContainer').innerHTML = '';
                 chatHistory = [];
                 selectedContract = null;
+                previewingContract = null;
                 missingFields = [];
                 selectedTransactionType = '';
                 selectedTransactionText = '';
                 document.getElementById('transactionType').value = '';
                 
+                hideAllSections();
                 document.getElementById('defaultState').style.display = 'block';
-                document.getElementById('contractSelection').style.display = 'none';
-                document.getElementById('missingFieldsForm').style.display = 'none';
-                document.getElementById('contractPreviewSection').style.display = 'none';
                 
                 showDefaultWelcome();
             }
