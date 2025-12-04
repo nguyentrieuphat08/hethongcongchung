@@ -160,6 +160,27 @@
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 15px;
         }
+        /* Placeholder styling for contract preview */
+        .placeholder-inline {
+            display: inline;
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            border-radius: 0;
+            font-family: inherit;
+            font-size: inherit;
+            font-weight: inherit;
+            cursor: default;
+            height: auto;
+            line-height: inherit;
+            margin: 0;
+            box-shadow: none;
+            white-space: normal;
+            vertical-align: baseline;
+        }
+        .placeholder-inline .remove-placeholder-inline {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -809,9 +830,12 @@ Bạn có muốn sử dụng mẫu này không?`);
                 document.getElementById('contractListSection').style.display = 'none';
                 document.getElementById('contractPreviewFull').style.display = 'block';
                 
-                // Set contract name and content
+                // Set contract name and content with sample data
                 document.getElementById('previewContractName').textContent = contract.name;
-                const content = contract.modified_content || contract.template || '<p class="text-muted">Không có nội dung</p>';
+                let content = contract.modified_content || contract.template || '<p class="text-muted">Không có nội dung</p>';
+                
+                // Replace placeholders with sample data for preview
+                content = displayWithSampleData(content);
                 document.getElementById('contractPreviewContent').innerHTML = content;
                 
                 addBotMessage(`📄 Đang xem trước: **${contract.name}**
@@ -888,7 +912,8 @@ Vui lòng điền vào form bên dưới.`);
                 document.getElementById('contractPreviewFull').style.display = 'block';
                 document.getElementById('previewContractName').textContent = previewingContract.name;
                 
-                const content = previewingContract.modified_content || previewingContract.template || '';
+                let content = previewingContract.modified_content || previewingContract.template || '';
+                content = displayWithSampleData(content);
                 document.getElementById('contractPreviewContent').innerHTML = content;
             }
         }
@@ -1104,6 +1129,18 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
             
             console.log(`  -> No match found for: ${field}`);
             return null;
+        }
+
+        // Display contract content with sample data (for preview)
+        function displayWithSampleData(content) {
+            // Replace placeholder spans with their sample data
+            return content.replace(
+                /<span[^>]*class="[^"]*placeholder-inline[^"]*"[^>]*data-sample="([^"]*)"[^>]*>[\s\S]*?<\/span>/gi,
+                (match, sampleData) => {
+                    // Return the sample data, or the original if no sample
+                    return sampleData || match;
+                }
+            );
         }
 
         function clearChat() {
