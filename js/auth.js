@@ -38,6 +38,13 @@ function generateSidebar(activePage) {
     const isAdminUser = user.role === 'admin';
     
     let menuItems = '';
+
+    // Home menu
+    menuItems += `
+        <a href="index.html" class="nav-link text-white mb-2 ${activePage === 'home' ? 'active' : ''}">
+            <i class="bi bi-house-fill me-2"></i>Trang chủ
+        </a>
+    `;
     
     // Admin-only menu
     if (isAdminUser) {
