@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - Hệ thống Công chứng</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header i {
+            font-size: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .login-header h2 {
+            margin-top: 15px;
+            color: #333;
+        }
+        .form-control {
+            border-radius: 10px;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+        .btn-login {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            color: white;
+            transition: all 0.3s;
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+        .input-group-text {
+            background: transparent;
+            border: 2px solid #e9ecef;
+            border-right: none;
+            border-radius: 10px 0 0 10px;
+        }
+        .input-group .form-control {
+            border-left: none;
+            border-radius: 0 10px 10px 0;
+        }
+        .alert {
+            border-radius: 10px;
+        }
+        .demo-accounts {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .demo-accounts h6 {
+            margin-bottom: 10px;
+            color: #6c757d;
+        }
+        .demo-account {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #dee2e6;
+        }
+        .demo-account:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <i class="bi bi-shield-lock"></i>
+            <h2>Đăng nhập</h2>
+            <p class="text-muted">Hệ thống Quản lý Hợp đồng Công chứng</p>
+        </div>
+
+        <div id="alertBox" class="alert alert-danger" style="display: none;"></div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="mb-3">
+                <label class="form-label">Tên đăng nhập</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input type="text" class="form-control" id="username" placeholder="Nhập tên đăng nhập" required>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label">Mật khẩu</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <input type="password" class="form-control" id="password" placeholder="Nhập mật khẩu" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-login" id="loginBtn">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập
+            </button>
+        </form>
+
+        <div class="demo-accounts">
+            <h6><i class="bi bi-info-circle me-1"></i>Tài khoản demo:</h6>
+            <div class="demo-account">
+                <span><strong>Admin:</strong> admin / admin123</span>
+                <span class="badge bg-danger">Toàn quyền</span>
+            </div>
+            <div class="demo-account">
+                <span><strong>User:</strong> user / user123</span>
+                <span class="badge bg-primary">Người dùng</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API endpoint
+        const API_BASE = '/api/users.php';
+
+        // Check if already logged in
+        window.addEventListener('load', () => {
+            const session = localStorage.getItem('userSession');
+            if (session) {
+                const user = JSON.parse(session);
+                redirectAfterLogin(user.role);
+            }
+        });
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const alertBox = document.getElementById('alertBox');
+            const loginBtn = document.getElementById('loginBtn');
+
+            // Hide previous error
+            alertBox.style.display = 'none';
+
+            // Validate
+            if (!username || !password) {
+                showError('Vui lòng nhập đầy đủ thông tin!');
+                return;
+            }
+
+            // Show loading
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang đăng nhập...';
+
+            try {
+                const response = await fetch(`${API_BASE}?action=login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    showError(data.message || 'Đăng nhập thất bại!');
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập';
+                    return;
+                }
+
+                // Save session
+                const userSession = {
+                    id: data.user.id,
+                    username: data.user.username,
+                    role: data.user.role,
+                    name: data.user.name,
+                    email: data.user.email,
+                    loginTime: new Date().toISOString()
+                };
+                localStorage.setItem('userSession', JSON.stringify(userSession));
+
+                // Redirect based on role
+                redirectAfterLogin(data.user.role);
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Lỗi kết nối server. Vui lòng thử lại!');
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập';
+            }
+        }
+
+        function redirectAfterLogin(role) {
+            if (role === 'admin') {
+                window.location.href = 'admin-contract.html';
+            } else {
+                window.location.href = 'user-extract.html';
+            }
+        }
+
+        function showError(message) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
