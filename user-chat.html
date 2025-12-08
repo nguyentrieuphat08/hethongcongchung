@@ -622,6 +622,112 @@
             return flattened;
         }
 
+        // ========== AI MAPPING FUNCTIONS ==========
+        let aiMappedData = {}; // Store AI-mapped data
+        
+        // Use AI to map extracted data to contract placeholders
+        async function aiMapDataToPlaceholders(placeholders, extractedInfo) {
+            console.log('🤖 Starting AI mapping...');
+            console.log('Placeholders:', placeholders);
+            console.log('Extracted data:', extractedInfo);
+            
+            // Prepare extracted data summary
+            const extractedSummary = {};
+            if (extractedInfo.cccd) {
+                Object.entries(extractedInfo.cccd).forEach(([party, data]) => {
+                    extractedSummary[`Đương sự ${party}`] = data;
+                });
+            }
+            
+            const prompt = `Bạn là trợ lý AI chuyên về hợp đồng pháp lý Việt Nam.
+
+NHIỆM VỤ: Map (ghép nối) thông tin đã trích xuất từ CCCD vào các placeholder trong hợp đồng.
+
+THÔNG TIN ĐÃ TRÍCH XUẤT:
+${JSON.stringify(extractedSummary, null, 2)}
+
+CÁC PLACEHOLDER CẦN ĐIỀN (tên biến trong hợp đồng):
+${placeholders.map(p => `- ${p.field} (${p.label || p.field})`).join('\n')}
+
+QUY TẮC:
+1. Đương sự A thường là BÊN BÁN/BÊN CHO THUÊ/BÊN CHUYỂN NHƯỢNG
+2. Đương sự B thường là BÊN MUA/BÊN THUÊ/BÊN NHẬN CHUYỂN NHƯỢNG
+3. Các field có "_ben_a", "_bên_A", "_A" cuối tên → lấy từ Đương sự A
+4. Các field có "_ben_b", "_bên_B", "_B" cuối tên → lấy từ Đương sự B
+5. fullname/Họ_và_tên → lấy từ fullname
+6. idcard/CMND/CCCD/số_cmnd → lấy từ idcard
+7. address/địa_chỉ/nơi_ĐKTT → lấy từ address
+8. birthday/ngày_sinh → lấy từ birthday
+9. issue_date/ngày_cấp → lấy từ issue_date
+10. Nếu không có thông tin phù hợp → để null
+
+TRẢ VỀ JSON với format:
+{
+  "mapping": {
+    "tên_placeholder": "giá_trị_từ_dữ_liệu_trích_xuất_hoặc_null"
+  }
+}
+
+CHỈ TRẢ VỀ JSON, KHÔNG CÓ TEXT KHÁC.`;
+
+            try {
+                const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 2048
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                
+                console.log('🤖 AI Response:', text);
+                
+                // Parse JSON from response
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const result = JSON.parse(jsonMatch[0]);
+                    if (result.mapping) {
+                        // Merge AI mapping into filledData
+                        Object.entries(result.mapping).forEach(([key, value]) => {
+                            if (value && value !== 'null' && value !== null) {
+                                aiMappedData[key] = value;
+                                filledData[key] = value;
+                            }
+                        });
+                        console.log('✅ AI Mapping successful:', aiMappedData);
+                        return true;
+                    }
+                }
+                
+                console.log('⚠️ Could not parse AI response');
+                return false;
+                
+            } catch (error) {
+                console.error('❌ AI Mapping error:', error);
+                return false;
+            }
+        }
+        
+        // Get value with AI mapping fallback
+        function getValueForFieldWithAI(field) {
+            // First check AI mapped data
+            if (aiMappedData[field]) {
+                return aiMappedData[field];
+            }
+            // Then fall back to regular matching
+            return getValueForField(field);
+        }
+
         async function loadAvailableContracts() {
             try {
                 const response = await fetch(CONTRACTS_DB_API);
@@ -1049,9 +1155,18 @@ Xem nội dung hợp đồng bên dưới. Nếu phù hợp, nhấn **"Dùng m�
             
             // Extract from modified_content
             if (selectedContract.modified_content) {
-                const regex = /data-field="([^"]+)"/g;
+                const regex = /data-field="([^"]+)"[^>]*data-label="([^"]*)"/g;
                 let match;
                 while ((match = regex.exec(selectedContract.modified_content)) !== null) {
+                    const field = match[1];
+                    const label = match[2] || field;
+                    if (!placeholders.some(p => p.field === field)) {
+                        placeholders.push({ field: field, label: label });
+                    }
+                }
+                // Also try without label
+                const regex2 = /data-field="([^"]+)"/g;
+                while ((match = regex2.exec(selectedContract.modified_content)) !== null) {
                     const field = match[1];
                     if (!placeholders.some(p => p.field === field)) {
                         placeholders.push({ field: field, label: field });
@@ -1059,13 +1174,24 @@ Xem nội dung hợp đồng bên dưới. Nếu phù hợp, nhấn **"Dùng m�
                 }
             }
             
-            // Find missing fields
+            // 🤖 Use AI to map extracted data to placeholders
+            if (Object.keys(extractedData).length > 0 && placeholders.length > 0) {
+                addBotMessage(`🤖 Đang sử dụng AI để ghép nối thông tin...`);
+                
+                const aiSuccess = await aiMapDataToPlaceholders(placeholders, extractedData);
+                
+                if (aiSuccess) {
+                    addBotMessage(`✅ AI đã ghép nối thành công ${Object.keys(aiMappedData).length} trường thông tin!`);
+                }
+            }
+            
+            // Find missing fields after AI mapping
             missingFields = findMissingFields(placeholders);
             
             if (missingFields.length > 0) {
                 addBotMessage(`✅ Đã chọn hợp đồng: **${selectedContract.name}**
 
-⚠️ Có **${missingFields.length} thông tin** còn thiếu cần bổ sung.
+⚠️ Còn **${missingFields.length} thông tin** cần bổ sung.
 Vui lòng điền vào form bên dưới.`);
                 showMissingFieldsForm();
             } else {
@@ -1102,7 +1228,12 @@ Vui lòng điền vào form bên dưới.`);
             placeholders.forEach(placeholder => {
                 const field = placeholder.field;
                 const label = placeholder.label || field;
-                const value = getValueForField(field);
+                
+                // Check AI mapped data first, then fallback to getValueForField
+                let value = aiMappedData[field];
+                if (!value) {
+                    value = getValueForField(field);
+                }
                 
                 if (!value) {
                     missing.push({
@@ -1200,13 +1331,17 @@ Vui lòng điền vào form bên dưới.`);
             
             console.log('=== GENERATE CONTRACT ===');
             console.log('FilledData:', filledData);
+            console.log('AI Mapped Data:', aiMappedData);
             
             // Only replace placeholders that admin has configured
             // Method 1: Replace placeholder spans with data-field attribute
             content = content.replace(/<span[^>]*class="[^"]*placeholder-inline[^"]*"[^>]*data-field="([^"]+)"[^>]*>[\s\S]*?<\/span>/gi, 
                 (match, field) => {
-                    // Only replace if we have data for this exact field
-                    const value = getValueForField(field);
+                    // Check AI mapped data first, then fallback to getValueForField
+                    let value = aiMappedData[field];
+                    if (!value) {
+                        value = getValueForField(field);
+                    }
                     console.log(`Field "${field}" => Value "${value}"`);
                     
                     if (value) {
@@ -1221,7 +1356,11 @@ Vui lòng điền vào form bên dưới.`);
             
             // Method 2: Replace {{field}} syntax in template
             content = content.replace(/\{\{([^}]+)\}\}/g, (match, field) => {
-                const value = getValueForField(field.trim());
+                // Check AI mapped data first
+                let value = aiMappedData[field.trim()];
+                if (!value) {
+                    value = getValueForField(field.trim());
+                }
                 if (value) {
                     return escapeHtml(value);
                 }
@@ -1386,7 +1525,12 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
                     
                     if (!field) return match;
                     
-                    const value = getValueForField(field);
+                    // Check AI mapped data first, then fallback to getValueForField
+                    let value = aiMappedData[field];
+                    if (!value) {
+                        value = getValueForField(field);
+                    }
+                    
                     if (value) {
                         // Has value - display it normally
                         return `<span class="filled-value">${escapeHtml(value)}</span>`;
