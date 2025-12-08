@@ -899,10 +899,7 @@ Tôi sẽ tư vấn pháp lý và gợi ý mẫu hợp đồng phù hợp!`);
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             message: message,
-                            transactionType: selectedTransactionType,
-                            transactionText: selectedTransactionText,
-                            extractedData: filledData,
-                            chatHistory: chatHistory.slice(-10)
+                            transactionType: selectedTransactionType
                         })
                     });
 
