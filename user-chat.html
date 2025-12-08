@@ -181,10 +181,19 @@
         .placeholder-inline .remove-placeholder-inline {
             display: none;
         }
-        /* Filled value styling - show actual data */
+        /* Filled value styling - show actual data, inherit ALL styles */
         .filled-value {
-            color: inherit;
-            font-weight: inherit;
+            color: inherit !important;
+            font-weight: inherit !important;
+            font-family: inherit !important;
+            font-size: inherit !important;
+            font-style: inherit !important;
+            text-decoration: inherit !important;
+            background: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            display: inline !important;
         }
         /* Missing placeholder styling - highlight missing fields */
         .missing-placeholder {
