@@ -545,21 +545,41 @@
         function flattenExtractedData(data) {
             const flattened = {};
             
+            // Map English keys to Vietnamese variations
+            const keyVariations = {
+                'issue_date': ['issue_date', 'ngay_cap', 'ngaycap'],
+                'expiry_date': ['expiry_date', 'ngay_het_han', 'ngayhethan'],
+                'fullname': ['fullname', 'ho_va_ten', 'hovaten', 'ho_ten', 'hoten'],
+                'birthday': ['birthday', 'ngay_sinh', 'ngaysinh'],
+                'idcard': ['idcard', 'so_cccd', 'socccd', 'so_cmnd', 'socmnd', 'cccd', 'cmnd'],
+                'address': ['address', 'dia_chi', 'diachi'],
+                'phone': ['phone', 'dien_thoai', 'dienthoai', 'so_dien_thoai'],
+                'email': ['email']
+            };
+            
             // Process CCCD data
             if (data.cccd) {
                 Object.entries(data.cccd).forEach(([party, info]) => {
                     Object.entries(info).forEach(([key, value]) => {
                         if (value) {
-                            // Create multiple key variations for matching
-                            flattened[`${key}_${party.toLowerCase()}`] = value;
-                            flattened[`${key}_ben_${party.toLowerCase()}`] = value;
-                            if (party === 'A') {
-                                flattened[key] = value; // Default to first party
-                                flattened[`${key}_ben_a`] = value;
-                            }
-                            if (party === 'B') {
-                                flattened[`${key}_ben_b`] = value;
-                            }
+                            const partyLower = party.toLowerCase();
+                            
+                            // Get all variations for this key
+                            const variations = keyVariations[key] || [key];
+                            
+                            // Create entries for each variation
+                            variations.forEach(varKey => {
+                                flattened[`${varKey}_${partyLower}`] = value;
+                                flattened[`${varKey}_ben_${partyLower}`] = value;
+                                
+                                if (party === 'A') {
+                                    flattened[varKey] = value; // Default to first party
+                                    flattened[`${varKey}_ben_a`] = value;
+                                }
+                                if (party === 'B') {
+                                    flattened[`${varKey}_ben_b`] = value;
+                                }
+                            });
                         }
                     });
                 });
@@ -570,12 +590,19 @@
                 Object.entries(data.other).forEach(([party, info]) => {
                     Object.entries(info).forEach(([key, value]) => {
                         if (value) {
-                            flattened[`${key}_${party.toLowerCase()}`] = value;
+                            const partyLower = party.toLowerCase();
+                            const variations = keyVariations[key] || [key];
+                            
+                            variations.forEach(varKey => {
+                                flattened[`${varKey}_${partyLower}`] = value;
+                                flattened[`${varKey}_ben_${partyLower}`] = value;
+                            });
                         }
                     });
                 });
             }
             
+            console.log('Flattened data:', flattened);
             return flattened;
         }
 
@@ -1210,20 +1237,26 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
             
             // Map of field aliases
             const aliases = {
-                'fullname': ['fullname', 'hovaten', 'hoten', 'name', 'ten'],
-                'birthday': ['birthday', 'ngaysinh', 'dob', 'birthdate'],
-                'idcard': ['idcard', 'cccd', 'cmnd', 'id', 'socccd', 'socmnd'],
-                'address': ['address', 'diachi', 'thuongtru', 'noio', 'dktt'],
-                'issue_date': ['issue_date', 'ngaycap', 'issuedate'],
-                'expiry_date': ['expiry_date', 'ngayhethan', 'expirydate'],
-                'phone': ['phone', 'dienthoai', 'sdt', 'mobile'],
+                'fullname': ['fullname', 'hovaten', 'hoten', 'name', 'ten', 'ho_va_ten', 'ho_ten'],
+                'birthday': ['birthday', 'ngaysinh', 'dob', 'birthdate', 'ngay_sinh'],
+                'idcard': ['idcard', 'cccd', 'cmnd', 'id', 'socccd', 'socmnd', 'so_cccd', 'so_cmnd'],
+                'address': ['address', 'diachi', 'thuongtru', 'noio', 'dktt', 'dia_chi', 'thuong_tru', 'noi_o'],
+                'issue_date': ['issue_date', 'ngaycap', 'issuedate', 'ngay_cap'],
+                'expiry_date': ['expiry_date', 'ngayhethan', 'expirydate', 'ngay_het_han'],
+                'phone': ['phone', 'dienthoai', 'sdt', 'mobile', 'dien_thoai', 'so_dien_thoai'],
                 'email': ['email', 'mail']
             };
+            
+            // Normalize baseField: remove underscores for comparison
+            const baseFieldNormalized = baseField.replace(/_/g, '');
             
             // Find which category this field belongs to
             let matchedCategory = null;
             for (const [category, aliasList] of Object.entries(aliases)) {
-                if (aliasList.some(a => baseField.includes(a) || a.includes(baseField))) {
+                // Check both original and normalized versions
+                const normalizedAliases = aliasList.map(a => a.replace(/_/g, ''));
+                if (aliasList.some(a => baseField.includes(a) || a.includes(baseField)) ||
+                    normalizedAliases.some(a => baseFieldNormalized.includes(a) || a.includes(baseFieldNormalized))) {
                     matchedCategory = category;
                     break;
                 }
