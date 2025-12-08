@@ -224,17 +224,17 @@
         }
         /* Placeholder edit popup */
         .placeholder-edit-popup {
-            position: absolute;
+            position: fixed;
             background: white;
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            min-width: 250px;
-            top: 100%;
-            left: 0;
-            margin-top: 5px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            z-index: 10000;
+            min-width: 280px;
+        }
+        .placeholder-edit-popup input {
+            margin-bottom: 0;
         }
         .add-placeholder-form {
             background-color: #f8f9fa;
@@ -1694,7 +1694,7 @@
             const sampleClass = viewMode === 'sample' ? ' sample-view' : '';
             const draggableAttr = viewMode === 'label' ? 'draggable="true"' : '';
             const removeIcon = viewMode === 'label' ? `<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i>` : '';
-            return `<span class="placeholder-inline${sampleClass}" ${draggableAttr} data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" onclick="editInlinePlaceholder(this)" title="{{${field}}}">${escapeHtml(displayText)}${removeIcon}</span>`;
+            return `<span class="placeholder-inline${sampleClass}" ${draggableAttr} data-field="${escapeHtml(field)}" data-label="${escapeHtml(label)}" data-sample="${escapeHtml(sampleData)}" onclick="editInlinePlaceholder(this, event)" title="{{${field}}}">${escapeHtml(displayText)}${removeIcon}</span>`;
         }
 
         // Setup drop zone for Word content - giống n8n
@@ -1911,18 +1911,32 @@
             });
         }
 
-        function editInlinePlaceholder(span) {
+        function editInlinePlaceholder(span, event) {
+            // Ngăn event lan tới các element khác
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
             // Close any existing popup
             const existingPopup = document.querySelector('.placeholder-edit-popup');
             if (existingPopup) existingPopup.remove();
             
-            const field = span.dataset.field;
-            const label = span.dataset.label;
-            const sample = span.dataset.sample;
+            const field = span.dataset.field || '';
+            const label = span.dataset.label || '';
+            const sample = span.dataset.sample || '';
             
-            // Create edit popup
+            // Create edit popup - append to body instead of span
             const popup = document.createElement('div');
             popup.className = 'placeholder-edit-popup';
+            popup.style.position = 'fixed';
+            
+            // Calculate position relative to span
+            const rect = span.getBoundingClientRect();
+            popup.style.top = (rect.bottom + 5) + 'px';
+            popup.style.left = rect.left + 'px';
+            
+            // Ensure popup doesn't go off screen
             popup.innerHTML = `
                 <div class="mb-2">
                     <label class="form-label small mb-1">Tên hiển thị</label>
@@ -1940,32 +1954,67 @@
                     <button class="btn btn-sm btn-primary flex-fill" onclick="saveInlinePlaceholder(this)">
                         <i class="bi bi-check me-1"></i>Lưu
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="this.closest('.placeholder-edit-popup').remove()">
+                    <button class="btn btn-sm btn-secondary" onclick="closeEditPopup()">
                         <i class="bi bi-x"></i>
                     </button>
                 </div>
             `;
             
-            span.style.position = 'relative';
-            span.appendChild(popup);
+            // Store reference to the span being edited
+            popup.dataset.targetSpanField = field;
+            popup._targetSpan = span;
             
-            // Focus on first input
-            popup.querySelector('#editLabel').focus();
+            // Append to body
+            document.body.appendChild(popup);
             
-            // Close on click outside
+            // Adjust position if off screen
+            const popupRect = popup.getBoundingClientRect();
+            if (popupRect.right > window.innerWidth) {
+                popup.style.left = (window.innerWidth - popupRect.width - 10) + 'px';
+            }
+            if (popupRect.bottom > window.innerHeight) {
+                popup.style.top = (rect.top - popupRect.height - 5) + 'px';
+            }
+            
+            // Prevent clicks inside popup from closing it
+            popup.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Focus on first input after a short delay
             setTimeout(() => {
-                document.addEventListener('click', function closePopup(e) {
-                    if (!popup.contains(e.target) && e.target !== span) {
-                        popup.remove();
-                        document.removeEventListener('click', closePopup);
-                    }
-                });
-            }, 100);
+                popup.querySelector('#editLabel').focus();
+            }, 50);
+            
+            // Close on click outside - with longer delay
+            setTimeout(() => {
+                document.addEventListener('click', closePopupOnClickOutside);
+            }, 200);
+        }
+        
+        function closePopupOnClickOutside(e) {
+            const popup = document.querySelector('.placeholder-edit-popup');
+            if (popup && !popup.contains(e.target)) {
+                popup.remove();
+                document.removeEventListener('click', closePopupOnClickOutside);
+            }
+        }
+        
+        function closeEditPopup() {
+            const popup = document.querySelector('.placeholder-edit-popup');
+            if (popup) popup.remove();
+            document.removeEventListener('click', closePopupOnClickOutside);
         }
 
         function saveInlinePlaceholder(btn) {
             const popup = btn.closest('.placeholder-edit-popup');
-            const span = popup.parentElement;
+            const span = popup._targetSpan;
+            
+            if (!span) {
+                showToast('Lỗi', 'Không tìm thấy placeholder', 'error');
+                closeEditPopup();
+                return;
+            }
             
             const newLabel = popup.querySelector('#editLabel').value.trim();
             const newField = popup.querySelector('#editField').value.trim().replace(/\s+/g, '_');
@@ -1980,16 +2029,20 @@
             span.dataset.field = newField;
             span.dataset.label = newLabel;
             span.dataset.sample = newSample;
+            span.title = `{{${newField}}}`;
             
-            // Update display
-            const displayText = viewMode === 'sample' ? newSample : `{{${newField}}}`;
-            const labelSpan = span.querySelector('.placeholder-label');
-            if (labelSpan) labelSpan.textContent = newLabel;
-            const smallEl = span.querySelector('small');
-            if (smallEl) smallEl.textContent = displayText;
+            // Update display text based on view mode
+            const displayText = viewMode === 'sample' ? newSample : newLabel;
             
-            // Update custom placeholders list
-            const existingIdx = customPlaceholders.findIndex(p => p.field === span.dataset.field);
+            // Update the span content - keep remove icon if in label mode
+            if (viewMode === 'label') {
+                span.innerHTML = `${escapeHtml(displayText)}<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i>`;
+            } else {
+                span.textContent = displayText;
+            }
+            
+            // Update custom placeholders list if exists
+            const existingIdx = customPlaceholders.findIndex(p => p.field === popup.dataset.targetSpanField);
             if (existingIdx >= 0) {
                 customPlaceholders[existingIdx] = {
                     field: newField,
@@ -1998,11 +2051,11 @@
                     isDefault: false,
                     sampleData: newSample
                 };
+                saveCustomPlaceholders();
+                renderPlaceholders();
             }
-            saveCustomPlaceholders();
-            renderPlaceholders();
             
-            popup.remove();
+            closeEditPopup();
             showToast('Đã lưu', 'Placeholder đã được cập nhật', 'success');
         }
 
