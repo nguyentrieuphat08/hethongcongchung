@@ -181,6 +181,22 @@
         .placeholder-inline .remove-placeholder-inline {
             display: none;
         }
+        /* Filled value styling - show actual data */
+        .filled-value {
+            color: inherit;
+            font-weight: inherit;
+        }
+        /* Missing placeholder styling - highlight missing fields */
+        .missing-placeholder {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+            border: 1px dashed #ffc107;
+            cursor: help;
+        }
         .extracted-data-badge {
             cursor: pointer;
             transition: all 0.3s;
@@ -1105,10 +1121,8 @@ Vui lòng điền vào form bên dưới.`);
             document.getElementById('missingFieldsSection').style.display = 'block';
             document.getElementById('selectedContractName').textContent = selectedContract.name;
             
-            // Show contract preview while filling - with sample data
-            let content = selectedContract.modified_content || selectedContract.template || '';
-            content = displayWithSampleData(content);
-            document.getElementById('contractPreviewWhileFilling').innerHTML = content;
+            // Show contract preview while filling - with filled data or placeholder names
+            updatePreviewWhileFilling();
             
             const container = document.getElementById('missingFieldsList');
             container.innerHTML = '';
@@ -1124,11 +1138,28 @@ Vui lòng điền vào form bên dưới.`);
                     <input type="text" 
                            class="form-control missing-field" 
                            id="field_${field.field}"
-                           placeholder="${field.sampleData || 'Nhập ' + field.label}"
-                           data-field="${field.field}">
+                           placeholder="Nhập ${field.label}:"
+                           data-field="${field.field}"
+                           oninput="onFieldInput(this)">
                 `;
                 container.appendChild(div);
             });
+        }
+        
+        // Update preview when user types in a field
+        function onFieldInput(input) {
+            const field = input.dataset.field;
+            const value = input.value.trim();
+            
+            if (value) {
+                filledData[field] = value;
+                input.classList.remove('is-invalid');
+            } else {
+                delete filledData[field];
+            }
+            
+            // Update the preview in real-time
+            updatePreviewWhileFilling();
         }
 
         function submitMissingFields() {
@@ -1306,6 +1337,44 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
                     return sampleData || match;
                 }
             );
+        }
+        
+        // Display contract content with filled data or placeholder name for missing fields
+        function displayWithFilledDataOrPlaceholder(content) {
+            // Replace placeholder spans with filled data or [field_name] for missing
+            // Use a more flexible regex that extracts attributes in any order
+            return content.replace(
+                /<span[^>]*class="[^"]*placeholder-inline[^"]*"[^>]*>[\s\S]*?<\/span>/gi,
+                (match) => {
+                    // Extract attributes from the match
+                    const fieldMatch = match.match(/data-field="([^"]*)"/i);
+                    const labelMatch = match.match(/data-label="([^"]*)"/i);
+                    const sampleMatch = match.match(/data-sample="([^"]*)"/i);
+                    
+                    const field = fieldMatch ? fieldMatch[1] : '';
+                    const label = labelMatch ? labelMatch[1] : field;
+                    
+                    if (!field) return match;
+                    
+                    const value = getValueForField(field);
+                    if (value) {
+                        // Has value - display it normally
+                        return `<span class="filled-value">${escapeHtml(value)}</span>`;
+                    } else {
+                        // Missing - show placeholder name with highlight
+                        return `<span class="missing-placeholder" title="Thông tin còn thiếu: ${escapeHtml(label)}">[${escapeHtml(field)}]</span>`;
+                    }
+                }
+            );
+        }
+        
+        // Update preview while filling form
+        function updatePreviewWhileFilling() {
+            if (!selectedContract) return;
+            
+            let content = selectedContract.modified_content || selectedContract.template || '';
+            content = displayWithFilledDataOrPlaceholder(content);
+            document.getElementById('contractPreviewWhileFilling').innerHTML = content;
         }
 
         function clearChat() {
