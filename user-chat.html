@@ -367,8 +367,33 @@
                         </button>
                     </div>
                     <div class="col-md-6">
-                        <h6 class="text-muted mb-2">Xem trước hợp đồng:</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-muted mb-0">Xem trước hợp đồng:</h6>
+                            <button class="btn btn-outline-primary btn-sm" onclick="openFullPreviewModal()">
+                                <i class="bi bi-arrows-fullscreen me-1"></i>Xem toàn bộ
+                            </button>
+                        </div>
                         <div class="contract-preview-full" id="contractPreviewWhileFilling" style="max-height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Preview Modal -->
+            <div class="modal fade" id="fullPreviewModal" tabindex="-1">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title text-primary">
+                                <i class="bi bi-file-earmark-text me-2"></i>Xem trước hợp đồng
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="contract-preview-full" id="contractPreviewModalContent" style="max-height: none;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1557,6 +1582,18 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
             let content = selectedContract.modified_content || selectedContract.template || '';
             content = displayWithFilledDataOrPlaceholder(content);
             document.getElementById('contractPreviewWhileFilling').innerHTML = content;
+        }
+
+        // Open full preview modal
+        function openFullPreviewModal() {
+            if (!selectedContract) return;
+            
+            let content = selectedContract.modified_content || selectedContract.template || '';
+            content = displayWithFilledDataOrPlaceholder(content);
+            document.getElementById('contractPreviewModalContent').innerHTML = content;
+            
+            const modal = new bootstrap.Modal(document.getElementById('fullPreviewModal'));
+            modal.show();
         }
 
         function clearChat() {
