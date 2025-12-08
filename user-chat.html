@@ -1256,38 +1256,43 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
                 }
             }
             
-            // 3. Try common field name mappings
-            // Extract party identifier from field (e.g., fullname_ben_a -> party A)
-            const partyMatch = field.match(/[_-](ben[_-]?)?([ab])$/i);
+            // 3. Normalize Vietnamese diacritics and try matching
+            const fieldNoDiacritics = removeVietnameseDiacritics(field);
+            for (const [key, value] of Object.entries(filledData)) {
+                if (removeVietnameseDiacritics(key) === fieldNoDiacritics) {
+                    console.log(`  -> Vietnamese normalized match: ${key} = ${value}`);
+                    return value;
+                }
+            }
+            
+            // 4. Try common field name mappings
+            // Extract party identifier from field (e.g., fullname_ben_a -> party A, Họ_và_tên_bên_A -> party A)
+            const partyMatch = field.match(/[_-]?(ben[_-]?)?([ab])$/i);
             const party = partyMatch ? partyMatch[2].toUpperCase() : null;
             
-            // Get base field name without party suffix
-            const baseField = field.replace(/[_-](ben[_-]?)?[ab]$/i, '').toLowerCase();
+            // Get base field name without party suffix - normalize Vietnamese
+            let baseField = field.replace(/[_-]?(ben[_-]?)?[ab]$/i, '');
+            baseField = removeVietnameseDiacritics(baseField).replace(/_/g, '');
             
-            console.log(`  -> Base field: "${baseField}", Party: "${party}"`);
+            console.log(`  -> Base field (normalized): "${baseField}", Party: "${party}"`);
             
-            // Map of field aliases
+            // Map of field aliases (all lowercase, no diacritics, no underscores)
             const aliases = {
-                'fullname': ['fullname', 'hovaten', 'hoten', 'name', 'ten', 'ho_va_ten', 'ho_ten'],
-                'birthday': ['birthday', 'ngaysinh', 'dob', 'birthdate', 'ngay_sinh'],
-                'idcard': ['idcard', 'cccd', 'cmnd', 'id', 'socccd', 'socmnd', 'so_cccd', 'so_cmnd'],
-                'address': ['address', 'diachi', 'thuongtru', 'noio', 'dktt', 'dia_chi', 'thuong_tru', 'noi_o'],
-                'issue_date': ['issue_date', 'ngaycap', 'issuedate', 'ngay_cap'],
-                'expiry_date': ['expiry_date', 'ngayhethan', 'expirydate', 'ngay_het_han'],
-                'phone': ['phone', 'dienthoai', 'sdt', 'mobile', 'dien_thoai', 'so_dien_thoai'],
-                'email': ['email', 'mail']
+                'fullname': ['fullname', 'hovaten', 'hoten', 'name', 'ten', 'hovatên', 'họvaten'],
+                'birthday': ['birthday', 'ngaysinh', 'dob', 'birthdate'],
+                'idcard': ['idcard', 'cccd', 'cmnd', 'id', 'socccd', 'socmnd', 'cmndcccd'],
+                'address': ['address', 'diachi', 'thuongtru', 'noio', 'dktt', 'noidktt'],
+                'issue_date': ['issuedate', 'ngaycap', 'ngày cap', 'ngaycấp'],
+                'expiry_date': ['expirydate', 'ngayhethan', 'ngàyhếthạn'],
+                'phone': ['phone', 'dienthoai', 'sdt', 'mobile', 'sodienthoai'],
+                'email': ['email', 'mail'],
+                'co_quan_cap': ['coquancap', 'noicap', 'cơquancấp', 'nơicấp']
             };
-            
-            // Normalize baseField: remove underscores for comparison
-            const baseFieldNormalized = baseField.replace(/_/g, '');
             
             // Find which category this field belongs to
             let matchedCategory = null;
             for (const [category, aliasList] of Object.entries(aliases)) {
-                // Check both original and normalized versions
-                const normalizedAliases = aliasList.map(a => a.replace(/_/g, ''));
-                if (aliasList.some(a => baseField.includes(a) || a.includes(baseField)) ||
-                    normalizedAliases.some(a => baseFieldNormalized.includes(a) || a.includes(baseFieldNormalized))) {
+                if (aliasList.some(a => baseField.includes(a) || a.includes(baseField))) {
                     matchedCategory = category;
                     break;
                 }
@@ -1298,10 +1303,10 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
                 
                 // Look for data with this category and party
                 for (const [key, value] of Object.entries(filledData)) {
-                    const keyLower = key.toLowerCase();
-                    const keyPartyMatch = key.match(/[_-]([ab])$/i);
+                    const keyNormalized = removeVietnameseDiacritics(key).replace(/_/g, '');
+                    const keyPartyMatch = key.match(/[_-]?([ab])$/i);
                     const keyParty = keyPartyMatch ? keyPartyMatch[1].toUpperCase() : null;
-                    const keyBase = key.replace(/[_-][ab]$/i, '').toLowerCase();
+                    const keyBase = keyNormalized.replace(/[ab]$/i, '');
                     
                     // Check if this key matches our category
                     const keyMatchesCategory = aliases[matchedCategory].some(a => 
@@ -1314,9 +1319,34 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
                             console.log(`  -> Found with party match: ${key} = ${value}`);
                             return value;
                         }
+                        // If field specifies party but key doesn't have party suffix, still try matching
+                        if (party && !keyParty) {
+                            // Check if the key ends with the party letter
+                            if (keyNormalized.endsWith(party.toLowerCase())) {
+                                console.log(`  -> Found with implicit party: ${key} = ${value}`);
+                                return value;
+                            }
+                        }
                         // If no party specified in field, return first match
                         if (!party) {
                             console.log(`  -> Found without party: ${key} = ${value}`);
+                            return value;
+                        }
+                    }
+                }
+                
+                // If we have a category match but no exact party match, try without party requirement
+                if (party) {
+                    for (const [key, value] of Object.entries(filledData)) {
+                        const keyNormalized = removeVietnameseDiacritics(key).replace(/_/g, '');
+                        const keyBase = keyNormalized.replace(/ben[ab]|[ab]$/gi, '');
+                        
+                        const keyMatchesCategory = aliases[matchedCategory].some(a => 
+                            keyBase.includes(a) || a.includes(keyBase)
+                        );
+                        
+                        if (keyMatchesCategory && key.toLowerCase().includes(party.toLowerCase())) {
+                            console.log(`  -> Found with party in key: ${key} = ${value}`);
                             return value;
                         }
                     }
@@ -1396,6 +1426,18 @@ Bạn có thể xem, tải xuống hoặc in hợp đồng bên dưới.`);
         }
 
         // ========== UTILITY FUNCTIONS ==========
+        
+        // Remove Vietnamese diacritics (accents) from text
+        function removeVietnameseDiacritics(str) {
+            if (!str) return '';
+            return str
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'D')
+                .toLowerCase();
+        }
+        
         function formatDate(dateStr) {
             if (!dateStr) return '';
             const date = new Date(dateStr);
