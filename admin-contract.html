@@ -1326,6 +1326,9 @@
                 // Enable drop on Word content
                 setupWordDropZone(contentDiv);
                 
+                // Bind click events to existing placeholders
+                bindPlaceholderEvents(contentDiv);
+                
                 // Render markers - Word không scale nên dùng scale = 1
                 currentPage = 1;
                 totalPages = 1;
@@ -1824,7 +1827,8 @@
                 placeholder.dataset.sample = sampleData;
                 placeholder.title = `{{${field}}}`;
                 placeholder.draggable = viewMode === 'label';
-                placeholder.onclick = function() { editInlinePlaceholder(this); };
+                placeholder.style.cursor = 'pointer';
+                placeholder.onclick = function(e) { editInlinePlaceholder(this, e); };
                 
                 const displayText = viewMode === 'label' ? label : sampleData;
                 if (viewMode === 'label') {
@@ -1909,6 +1913,29 @@
             placeholders.forEach(placeholder => {
                 setupPlaceholderDrag(placeholder);
             });
+        }
+        
+        // Bind click events to all existing placeholders in content
+        function bindPlaceholderEvents(contentDiv) {
+            const placeholders = contentDiv.querySelectorAll('.placeholder-inline');
+            placeholders.forEach(placeholder => {
+                // Remove existing onclick to avoid duplicates
+                placeholder.onclick = null;
+                
+                // Add click event listener
+                placeholder.addEventListener('click', function(e) {
+                    editInlinePlaceholder(this, e);
+                });
+                
+                // Ensure cursor is pointer
+                placeholder.style.cursor = 'pointer';
+                
+                // Setup drag if in label mode
+                if (viewMode === 'label') {
+                    setupPlaceholderDrag(placeholder);
+                }
+            });
+            console.log(`Bound events to ${placeholders.length} existing placeholders`);
         }
 
         function editInlinePlaceholder(span, event) {
@@ -2091,6 +2118,10 @@
                     };
                     span.appendChild(icon);
                 }
+                
+                // Re-bind click event
+                span.style.cursor = 'pointer';
+                span.onclick = function(e) { editInlinePlaceholder(this, e); };
             });
         }
 
