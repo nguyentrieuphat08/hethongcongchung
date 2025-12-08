@@ -559,7 +559,7 @@
                             </div>
                             <div class="col-md-6 mb-2">
                                 <label class="form-label small text-muted">Cơ quan cấp:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.issuing_authority || data['cơ quan cấp'] || ''}" readonly>
+                                <input type="text" class="form-control form-control-sm" value="${data.issuing_authority || ''}" readonly>
                             </div>
                             <div class="col-md-6 mb-2">
                                 <label class="form-label small text-muted">Ngày hết hạn:</label>
@@ -627,7 +627,7 @@
                     printWindow.document.write('<tr><th>Ngày sinh</th><td>' + (data.birthday || '') + '</td></tr>');
                     printWindow.document.write('<tr><th>Số CMND/CCCD</th><td>' + (data.idcard || '') + '</td></tr>');
                     printWindow.document.write('<tr><th>Ngày cấp</th><td>' + (data.issue_date || '') + '</td></tr>');
-                    printWindow.document.write('<tr><th>Cơ quan cấp</th><td>' + (data.issuing_authority || data['cơ quan cấp'] || '') + '</td></tr>');
+                    printWindow.document.write('<tr><th>Cơ quan cấp</th><td>' + (data.issuing_authority || '') + '</td></tr>');
                     printWindow.document.write('<tr><th>Ngày hết hạn</th><td>' + (data.expiry_date || '') + '</td></tr>');
                     printWindow.document.write('<tr><th>Địa chỉ</th><td>' + (data.address || '') + '</td></tr>');
                     printWindow.document.write('</table>');
