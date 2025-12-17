@@ -456,12 +456,29 @@
         let chatHistory = [];
         let selectedTransactionType = '';
         let selectedTransactionText = '';
+        let chatSessionId = null; // Session ID cho cuộc trò chuyện
+        
+        // Tạo hoặc lấy session ID
+        function getOrCreateSessionId() {
+            let sessionId = sessionStorage.getItem('chatSessionId');
+            if (!sessionId) {
+                // Tạo ID mới: timestamp + random string
+                sessionId = 'chat_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+                sessionStorage.setItem('chatSessionId', sessionId);
+                console.log('Created new chat session:', sessionId);
+            }
+            return sessionId;
+        }
 
         // ========== INITIALIZATION ==========
         window.addEventListener('load', async () => {
             // Check auth and generate sidebar
             if (!initPage('user-chat')) return;
             document.getElementById('sidebarMenu').innerHTML = generateSidebar('user-chat');
+            
+            // Khởi tạo session ID
+            chatSessionId = getOrCreateSessionId();
+            console.log('Chat session ID:', chatSessionId);
             
             loadExtractedData();
             await loadAvailableContracts();
@@ -934,6 +951,7 @@ Tôi sẽ tư vấn pháp lý và gợi ý mẫu hợp đồng phù hợp!`);
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            sessionId: chatSessionId,
                             message: message,
                             transactionType: selectedTransactionType
                         })
