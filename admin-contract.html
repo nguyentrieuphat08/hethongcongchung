@@ -1621,7 +1621,7 @@
 
             const btn = document.getElementById('aiDetectBtn');
             const originalBtnText = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>AI đang phân tích...';
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Bước 1: AI đang đọc hợp đồng...';
             btn.disabled = true;
 
             try {
@@ -1642,15 +1642,26 @@
                     throw new Error('Không thể đọc nội dung hợp đồng');
                 }
 
-                // Call Gemini API
-                const placeholderSuggestions = await callGeminiAPI(documentText);
+                // Bước 1: AI đọc và chèn marker vào văn bản
+                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Bước 1: AI đang chèn marker...';
+                const markedText = await callGeminiAPI(documentText);
                 
-                if (placeholderSuggestions && placeholderSuggestions.length > 0) {
-                    // Replace dots with placeholders in Word document
-                    insertPlaceholdersInWord(placeholderSuggestions);
-                } else {
+                if (!markedText || !markedText.includes('<<')) {
                     showToast('Thông báo', 'AI không tìm thấy vị trí phù hợp để đặt placeholder', 'warning');
+                    return;
                 }
+                
+                // Bước 2: Parse marker và tạo placeholder
+                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Bước 2: Đang tạo placeholder...';
+                const parsedMarkers = parseMarkersFromText(markedText);
+                
+                if (parsedMarkers.length === 0) {
+                    showToast('Thông báo', 'Không tìm thấy marker trong kết quả AI', 'warning');
+                    return;
+                }
+                
+                // Chèn placeholder vào văn bản dựa trên marker
+                insertPlaceholdersFromMarkers(wordContent, markedText, parsedMarkers);
 
             } catch (error) {
                 console.error('AI Error:', error);
@@ -1661,43 +1672,49 @@
             }
         }
 
-        function insertPlaceholdersInWord(suggestions) {
-            const wordContent = document.getElementById('wordContent');
-            if (!wordContent) return;
-
+        function insertPlaceholdersFromMarkers(wordContent, markedText, parsedMarkers) {
             const allPlaceholders = getAllPlaceholders();
-
-            // Process each suggestion - add to custom placeholders
-            suggestions.forEach(suggestion => {
-                // Add to custom placeholders if not exists
-                if (!allPlaceholders.some(p => p.field === suggestion.field)) {
+            
+            // Thêm vào custom placeholders
+            parsedMarkers.forEach(marker => {
+                if (!allPlaceholders.some(p => p.field === marker.field)) {
                     customPlaceholders.push({
-                        field: suggestion.field,
-                        label: suggestion.label,
+                        field: marker.field,
+                        label: marker.label,
                         icon: 'bi-robot',
                         isDefault: false,
-                        sampleData: suggestion.sampleData || suggestion.label
+                        sampleData: marker.sampleData
                     });
                 }
-
-                // Add to placeholderMappings
-                if (!placeholderMappings.some(m => m.field === suggestion.field)) {
+                
+                if (!placeholderMappings.some(m => m.field === marker.field)) {
                     placeholderMappings.push({
-                        field: suggestion.field,
-                        label: suggestion.label,
-                        sampleData: suggestion.sampleData || suggestion.label,
-                        contextBefore: suggestion.contextBefore || ''
+                        field: marker.field,
+                        label: marker.label,
+                        sampleData: marker.sampleData
                     });
                 }
             });
-
-            // Replace dots with placeholder spans in the HTML
-            // Truyền suggestions (có thể rỗng) - hàm sẽ tự detect patterns
-            replaceDotsWithPlaceholders(wordContent, suggestions);
-
-            // Setup drag for newly inserted placeholders
+            
+            // Thay thế marker trong HTML bằng placeholder span
+            let html = wordContent.innerHTML;
+            
+            // Với mỗi marker, tìm text gốc tương ứng và thay thế
+            parsedMarkers.forEach(marker => {
+                const placeholderSpan = createPlaceholderSpan(marker.field, marker.label, marker.sampleData);
+                // Thay thế marker <<...>> bằng placeholder span
+                // Tìm trong text content và thay trong HTML
+                const markerRegex = new RegExp(escapeRegExp(marker.fullMatch), 'g');
+                html = html.replace(markerRegex, placeholderSpan);
+            });
+            
+            // Cập nhật nội dung
+            wordContent.innerHTML = html;
+            
+            // Setup drag cho placeholder mới
             setupExistingPlaceholdersDrag(wordContent);
-
+            bindPlaceholderEvents(wordContent);
+            
             // Save
             saveCustomPlaceholders();
             savePlaceholderMappings();
@@ -1705,6 +1722,10 @@
             
             const insertedCount = document.querySelectorAll('.placeholder-inline').length;
             showToast('Thành công', `AI đã chèn ${insertedCount} placeholder. Kéo thả để di chuyển, click để chỉnh sửa.`, 'success');
+        }
+        
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
         function createPlaceholderSpan(field, label, sampleData) {
@@ -2329,67 +2350,45 @@
         }
 
         async function callGeminiAPI(documentText) {
-            const prompt = `Bạn là chuyên gia phân tích hợp đồng/văn bản pháp lý Việt Nam. Nhiệm vụ: tìm CHÍNH XÁC các vị trí cần điền thông tin.
+            const prompt = `Bạn là chuyên gia phân tích hợp đồng Việt Nam. Nhiệm vụ: CHÈN marker vào ĐÚNG vị trí cần điền thông tin.
 
-NGUYÊN TẮC QUAN TRỌNG:
-1. Phân tích NGỮ CẢNH xung quanh để xác định ĐÚNG loại thông tin cần điền
-2. Có 2 DẠNG vị trí cần điền:
-   - DẠNG 1: Có dấu "...", "…", "___" (ví dụ: "Họ và tên: ............")
-   - DẠNG 2: Chỉ có label + dấu ":" rồi xuống dòng hoặc khoảng trắng (ví dụ: "Họ và tên:" hoặc "Họ và tên: ")
-3. Cả 2 dạng đều cần được nhận diện và tạo placeholder
+CÁCH LÀM:
+1. Đọc văn bản hợp đồng
+2. Tìm các vị trí cần điền (sau dấu ":", sau "Ông:", "Bà:", hoặc chỗ có "...", "___")
+3. CHÈN marker <<field|Label|SampleData>> vào ĐÚNG vị trí đó
+4. GIỮ NGUYÊN toàn bộ văn bản, chỉ thêm marker vào
 
-VÍ DỤ:
-- "Họ và tên: " (không có dấu chấm) → vẫn cần placeholder cho họ tên
-- "Địa chỉ:" (không có dấu chấm) → vẫn cần placeholder cho địa chỉ
-- "CCCD số:" → vẫn cần placeholder cho số CCCD
+ĐỊNH DẠNG MARKER: <<tên_biến|Nhãn hiển thị|Dữ liệu mẫu>>
 
-PHÂN BIỆT LOẠI THÔNG TIN:
-- HỌ TÊN: sau "Ông/Bà:", "Họ và tên:", "Tên:", "Ông:", "Bà:"
-- NGÀY THÁNG KÝ: sau "ngày", "tháng", "năm" (trong ngữ cảnh ký hợp đồng)
-- NGÀY SINH: sau "sinh ngày", "ngày sinh", "Sinh năm"
-- SỐ CCCD/CMND: sau "CCCD:", "CMND:", "Số CCCD:", "Căn cước:"
-- ĐỊA CHỈ: sau "Địa chỉ:", "thường trú:", "ĐKTT:", "Nơi ở:", "tại:"
-- SỐ TIỀN: sau "Số tiền:", "Giá:", trước "đồng", "VNĐ"
-- SỐ ĐIỆN THOẠI: sau "SĐT:", "Điện thoại:", "Phone:"
-- NGÀY CẤP: sau "cấp ngày:", "ngày cấp:"
-- NƠI CẤP: sau "cấp tại:", "nơi cấp:", "do...cấp"
-- Nếu có "Bên A", "Bên B", "Bên thuê", "Bên cho thuê" → đánh số rõ ràng
+VÍ DỤ INPUT:
+"Ông: ............
+CMND số: ............ cấp ngày: ............
+Địa chỉ: ............"
 
-Hợp đồng:
+VÍ DỤ OUTPUT:
+"Ông: <<ten_ben_a|Họ tên bên A|Nguyễn Văn A>>
+CMND số: <<cmnd_ben_a|Số CMND bên A|001234567890>> cấp ngày: <<ngay_cap_ben_a|Ngày cấp|01/01/2020>>
+Địa chỉ: <<dia_chi_ben_a|Địa chỉ bên A|123 Đường ABC, Quận 1>>"
+
+QUY TẮC ĐẶT TÊN BIẾN:
+- Bên A (bên cho thuê, bên bán): _ben_a
+- Bên B (bên thuê, bên mua): _ben_b  
+- Ngày ký hợp đồng: ngay_ky, thang_ky, nam_ky
+- Địa điểm ký: dia_diem_ky
+- Số tiền: so_tien, so_tien_bang_chu
+
+QUAN TRỌNG:
+- XÓA các dấu "...", "…", "___" và THAY BẰNG marker
+- GIỮ NGUYÊN cấu trúc văn bản (xuống dòng, khoảng trắng)
+- MỖI vị trí chỉ có 1 marker
+- KHÔNG thêm text giải thích, chỉ trả về văn bản đã chèn marker
+
+Hợp đồng cần xử lý:
 """
-${documentText.substring(0, 15000)}
+${documentText.substring(0, 12000)}
 """
 
-Yêu cầu:
-1. Tìm TẤT CẢ vị trí cần điền, KỂ CẢ những chỗ KHÔNG có dấu "..."
-2. Nếu thấy "Label:" mà sau đó trống hoặc xuống dòng → đó là vị trí cần điền
-3. contextBefore: từ/cụm từ NGAY TRƯỚC chỗ cần điền (bao gồm dấu ":")
-4. Đánh số theo bên: fullname_ben_a, fullname_ben_b, address_ben_a, v.v.
-
-Trả về JSON array:
-[
-  {
-    "contextBefore": "Họ và tên:",
-    "field": "fullname_ben_a",
-    "label": "Họ tên bên A",
-    "sampleData": "Nguyễn Văn A",
-    "hasDotsInOriginal": false
-  },
-  {
-    "contextBefore": "CCCD số:",
-    "field": "cccd_ben_a", 
-    "label": "Số CCCD bên A",
-    "sampleData": "001234567890",
-    "hasDotsInOriginal": true
-  }
-]
-
-CHÚ Ý: 
-- hasDotsInOriginal: true nếu có dấu "...", false nếu chỉ có label + ":"
-- Dữ liệu mẫu phải PHÙ HỢP với loại thông tin
-- KHÔNG bỏ sót các vị trí chỉ có "Label:" mà không có dấu chấm
-
-Chỉ trả về JSON array, không có text khác.`;
+Trả về văn bản ĐÃ CHÈN marker (không cần markdown code block):`;
 
             const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
                 method: 'POST',
@@ -2417,20 +2416,27 @@ Chỉ trả về JSON array, không có text khác.`;
             const data = await response.json();
             const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
             
-            // Parse JSON from response
-            try {
-                // Extract JSON from response (may have markdown code blocks)
-                let jsonStr = responseText;
-                if (responseText.includes('```json')) {
-                    jsonStr = responseText.split('```json')[1].split('```')[0];
-                } else if (responseText.includes('```')) {
-                    jsonStr = responseText.split('```')[1].split('```')[0];
-                }
-                return JSON.parse(jsonStr.trim());
-            } catch (e) {
-                console.error('Parse error:', e, responseText);
-                throw new Error('Không thể phân tích kết quả từ AI');
+            // Trả về text đã có marker, không cần parse JSON
+            return responseText.trim();
+        }
+        
+        // Hàm parse marker từ text AI trả về
+        function parseMarkersFromText(markedText) {
+            const markers = [];
+            // Regex tìm <<field|label|sampleData>>
+            const regex = /<<([^|]+)\|([^|]+)\|([^>]+)>>/g;
+            let match;
+            
+            while ((match = regex.exec(markedText)) !== null) {
+                markers.push({
+                    field: match[1].trim(),
+                    label: match[2].trim(),
+                    sampleData: match[3].trim(),
+                    fullMatch: match[0]
+                });
             }
+            
+            return markers;
         }
 
         function showAISuggestions(suggestions) {
