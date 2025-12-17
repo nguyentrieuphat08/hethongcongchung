@@ -878,12 +878,20 @@
 
         // ========== PLACEHOLDERS MANAGEMENT ==========
         function loadCustomPlaceholders() {
-            const saved = localStorage.getItem(PLACEHOLDERS_KEY);
-            customPlaceholders = saved ? JSON.parse(saved) : [];
+            // Load từ contract hiện tại nếu có, không thì mảng rỗng
+            if (currentContract && currentContract.customPlaceholders) {
+                customPlaceholders = currentContract.customPlaceholders;
+            } else {
+                customPlaceholders = [];
+            }
         }
 
         function saveCustomPlaceholders() {
-            localStorage.setItem(PLACEHOLDERS_KEY, JSON.stringify(customPlaceholders));
+            // Lưu vào contract hiện tại
+            if (currentContract) {
+                currentContract.customPlaceholders = customPlaceholders;
+                saveContracts();
+            }
         }
 
         function getAllPlaceholders() {
@@ -1167,6 +1175,10 @@
             
             currentContract = contracts[index];
             markers = currentContract.markers || [];
+            
+            // Load custom placeholders cho hợp đồng này
+            loadCustomPlaceholders();
+            renderPlaceholders();
             
             // Determine file type
             const fileType = currentContract.fileType || 'pdf';
