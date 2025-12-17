@@ -1642,26 +1642,18 @@
                     throw new Error('Không thể đọc nội dung hợp đồng');
                 }
 
-                // Bước 1: AI đọc và chèn marker vào văn bản
-                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Bước 1: AI đang chèn marker...';
-                const markedText = await callGeminiAPI(documentText);
+                // Bước 1: AI phân tích và trả về danh sách vị trí
+                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Bước 1: AI đang phân tích...';
+                const suggestions = await callGeminiAPI(documentText);
                 
-                if (!markedText || !markedText.includes('<<')) {
+                if (!suggestions || suggestions.length === 0) {
                     showToast('Thông báo', 'AI không tìm thấy vị trí phù hợp để đặt placeholder', 'warning');
                     return;
                 }
                 
-                // Bước 2: Parse marker và tạo placeholder
-                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Bước 2: Đang tạo placeholder...';
-                const parsedMarkers = parseMarkersFromText(markedText);
-                
-                if (parsedMarkers.length === 0) {
-                    showToast('Thông báo', 'Không tìm thấy marker trong kết quả AI', 'warning');
-                    return;
-                }
-                
-                // Chèn placeholder vào văn bản dựa trên marker
-                insertPlaceholdersFromMarkers(wordContent, markedText, parsedMarkers);
+                // Bước 2: Chèn placeholder vào văn bản
+                btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Bước 2: Đang chèn placeholder...';
+                insertPlaceholdersFromSuggestions(wordContent, suggestions);
 
             } catch (error) {
                 console.error('AI Error:', error);
@@ -1672,44 +1664,104 @@
             }
         }
 
-        function insertPlaceholdersFromMarkers(wordContent, markedText, parsedMarkers) {
+        function insertPlaceholdersFromSuggestions(wordContent, suggestions) {
             const allPlaceholders = getAllPlaceholders();
+            let insertedCount = 0;
             
             // Thêm vào custom placeholders
-            parsedMarkers.forEach(marker => {
-                if (!allPlaceholders.some(p => p.field === marker.field)) {
+            suggestions.forEach(suggestion => {
+                if (!allPlaceholders.some(p => p.field === suggestion.field)) {
                     customPlaceholders.push({
-                        field: marker.field,
-                        label: marker.label,
+                        field: suggestion.field,
+                        label: suggestion.label,
                         icon: 'bi-robot',
                         isDefault: false,
-                        sampleData: marker.sampleData
+                        sampleData: suggestion.sampleData
                     });
                 }
                 
-                if (!placeholderMappings.some(m => m.field === marker.field)) {
+                if (!placeholderMappings.some(m => m.field === suggestion.field)) {
                     placeholderMappings.push({
-                        field: marker.field,
-                        label: marker.label,
-                        sampleData: marker.sampleData
+                        field: suggestion.field,
+                        label: suggestion.label,
+                        sampleData: suggestion.sampleData
                     });
                 }
             });
             
-            // Thay thế marker trong HTML bằng placeholder span
-            let html = wordContent.innerHTML;
+            // Duyệt qua tất cả text nodes trong wordContent
+            const walker = document.createTreeWalker(
+                wordContent,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
             
-            // Với mỗi marker, tìm text gốc tương ứng và thay thế
-            parsedMarkers.forEach(marker => {
-                const placeholderSpan = createPlaceholderSpan(marker.field, marker.label, marker.sampleData);
-                // Thay thế marker <<...>> bằng placeholder span
-                // Tìm trong text content và thay trong HTML
-                const markerRegex = new RegExp(escapeRegExp(marker.fullMatch), 'g');
-                html = html.replace(markerRegex, placeholderSpan);
+            const textNodes = [];
+            let node;
+            while (node = walker.nextNode()) {
+                textNodes.push(node);
+            }
+            
+            // Với mỗi suggestion, tìm và thay thế
+            suggestions.forEach(suggestion => {
+                const contextBefore = suggestion.contextBefore;
+                const textToReplace = suggestion.textToReplace || '';
+                
+                for (let i = 0; i < textNodes.length; i++) {
+                    const textNode = textNodes[i];
+                    const text = textNode.textContent;
+                    
+                    // Tìm context trong text node
+                    const contextIndex = text.indexOf(contextBefore);
+                    if (contextIndex !== -1) {
+                        // Tìm vị trí bắt đầu của phần cần thay thế
+                        const afterContext = contextIndex + contextBefore.length;
+                        
+                        // Tìm phần dots/underscores sau context
+                        const afterText = text.substring(afterContext);
+                        const dotsMatch = afterText.match(/^[.\s…_·]+/);
+                        
+                        if (dotsMatch || textToReplace) {
+                            const dotsLength = dotsMatch ? dotsMatch[0].length : 0;
+                            
+                            // Tạo placeholder span
+                            const span = document.createElement('span');
+                            span.className = viewMode === 'sample' ? 'placeholder-inline sample-view' : 'placeholder-inline';
+                            span.dataset.field = suggestion.field;
+                            span.dataset.label = suggestion.label;
+                            span.dataset.sample = suggestion.sampleData;
+                            span.setAttribute('title', '{{' + suggestion.field + '}}');
+                            span.setAttribute('onclick', 'editInlinePlaceholder(this, event)');
+                            if (viewMode === 'label') {
+                                span.setAttribute('draggable', 'true');
+                            }
+                            
+                            const displayText = viewMode === 'label' ? suggestion.label : suggestion.sampleData;
+                            span.innerHTML = escapeHtml(displayText) + (viewMode === 'label' ? '<i class="bi bi-x remove-placeholder-inline" onclick="event.stopPropagation(); removeInlinePlaceholder(this)"></i>' : '');
+                            
+                            // Split text node và chèn span
+                            const beforeText = text.substring(0, afterContext);
+                            const afterDotsText = text.substring(afterContext + dotsLength);
+                            
+                            const parent = textNode.parentNode;
+                            const beforeNode = document.createTextNode(beforeText);
+                            const afterNode = document.createTextNode(afterDotsText);
+                            
+                            parent.insertBefore(beforeNode, textNode);
+                            parent.insertBefore(span, textNode);
+                            parent.insertBefore(afterNode, textNode);
+                            parent.removeChild(textNode);
+                            
+                            // Cập nhật lại textNodes array
+                            textNodes[i] = afterNode;
+                            
+                            insertedCount++;
+                            break; // Chỉ thay thế 1 lần cho mỗi suggestion
+                        }
+                    }
+                }
             });
-            
-            // Cập nhật nội dung
-            wordContent.innerHTML = html;
             
             // Setup drag cho placeholder mới
             setupExistingPlaceholdersDrag(wordContent);
@@ -1720,7 +1772,6 @@
             savePlaceholderMappings();
             renderPlaceholders();
             
-            const insertedCount = document.querySelectorAll('.placeholder-inline').length;
             showToast('Thành công', `AI đã chèn ${insertedCount} placeholder. Kéo thả để di chuyển, click để chỉnh sửa.`, 'success');
         }
         
@@ -2350,45 +2401,41 @@
         }
 
         async function callGeminiAPI(documentText) {
-            const prompt = `Bạn là chuyên gia phân tích hợp đồng Việt Nam. Nhiệm vụ: CHÈN marker vào ĐÚNG vị trí cần điền thông tin.
+            const prompt = `Bạn là chuyên gia phân tích hợp đồng Việt Nam. Nhiệm vụ: TÌM các vị trí cần điền thông tin.
 
 CÁCH LÀM:
 1. Đọc văn bản hợp đồng
-2. Tìm các vị trí cần điền (sau dấu ":", sau "Ông:", "Bà:", hoặc chỗ có "...", "___")
-3. CHÈN marker <<field|Label|SampleData>> vào ĐÚNG vị trí đó
-4. GIỮ NGUYÊN toàn bộ văn bản, chỉ thêm marker vào
+2. Tìm các vị trí cần điền thông tin (sau "Ông:", "Bà:", "CMND số:", "Địa chỉ:", v.v.)
+3. Xác định CHÍNH XÁC text ngay trước chỗ cần điền (contextBefore)
+4. Xác định text cần thay thế (thường là "...", "…", "___", hoặc khoảng trắng)
 
-ĐỊNH DẠNG MARKER: <<tên_biến|Nhãn hiển thị|Dữ liệu mẫu>>
-
-VÍ DỤ INPUT:
-"Ông: ............
-CMND số: ............ cấp ngày: ............
-Địa chỉ: ............"
-
-VÍ DỤ OUTPUT:
-"Ông: <<ten_ben_a|Họ tên bên A|Nguyễn Văn A>>
-CMND số: <<cmnd_ben_a|Số CMND bên A|001234567890>> cấp ngày: <<ngay_cap_ben_a|Ngày cấp|01/01/2020>>
-Địa chỉ: <<dia_chi_ben_a|Địa chỉ bên A|123 Đường ABC, Quận 1>>"
+VÍ DỤ PHÂN TÍCH:
+Input: "Ông: ............  CMND số: ............ cấp ngày: ............"
+Output:
+- contextBefore: "Ông: " → field: ten_ben_a, thay "............"
+- contextBefore: "CMND số: " → field: cmnd_ben_a, thay "............"
+- contextBefore: "cấp ngày: " → field: ngay_cap_ben_a, thay "............"
 
 QUY TẮC ĐẶT TÊN BIẾN:
 - Bên A (bên cho thuê, bên bán): _ben_a
 - Bên B (bên thuê, bên mua): _ben_b  
 - Ngày ký hợp đồng: ngay_ky, thang_ky, nam_ky
 - Địa điểm ký: dia_diem_ky
-- Số tiền: so_tien, so_tien_bang_chu
 
 QUAN TRỌNG:
-- XÓA các dấu "...", "…", "___" và THAY BẰNG marker
-- GIỮ NGUYÊN cấu trúc văn bản (xuống dòng, khoảng trắng)
-- MỖI vị trí chỉ có 1 marker
-- KHÔNG thêm text giải thích, chỉ trả về văn bản đã chèn marker
+- contextBefore phải CHÍNH XÁC như trong văn bản (bao gồm dấu ":" và khoảng trắng)
+- textToReplace là chuỗi dots hoặc underscores cần thay thế
 
-Hợp đồng cần xử lý:
+Hợp đồng:
 """
 ${documentText.substring(0, 12000)}
 """
 
-Trả về văn bản ĐÃ CHÈN marker (không cần markdown code block):`;
+Trả về JSON array (KHÔNG markdown code block):
+[
+  {"contextBefore": "Ông: ", "textToReplace": "............", "field": "ten_ben_a", "label": "Họ tên bên A", "sampleData": "Nguyễn Văn A"},
+  {"contextBefore": "CMND số: ", "textToReplace": "............", "field": "cmnd_ben_a", "label": "Số CMND bên A", "sampleData": "001234567890"}
+]`;
 
             const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
                 method: 'POST',
@@ -2416,27 +2463,19 @@ Trả về văn bản ĐÃ CHÈN marker (không cần markdown code block):`;
             const data = await response.json();
             const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
             
-            // Trả về text đã có marker, không cần parse JSON
-            return responseText.trim();
-        }
-        
-        // Hàm parse marker từ text AI trả về
-        function parseMarkersFromText(markedText) {
-            const markers = [];
-            // Regex tìm <<field|label|sampleData>>
-            const regex = /<<([^|]+)\|([^|]+)\|([^>]+)>>/g;
-            let match;
-            
-            while ((match = regex.exec(markedText)) !== null) {
-                markers.push({
-                    field: match[1].trim(),
-                    label: match[2].trim(),
-                    sampleData: match[3].trim(),
-                    fullMatch: match[0]
-                });
+            // Parse JSON from response
+            try {
+                let jsonStr = responseText;
+                if (responseText.includes('```json')) {
+                    jsonStr = responseText.split('```json')[1].split('```')[0];
+                } else if (responseText.includes('```')) {
+                    jsonStr = responseText.split('```')[1].split('```')[0];
+                }
+                return JSON.parse(jsonStr.trim());
+            } catch (e) {
+                console.error('Parse error:', e, responseText);
+                throw new Error('Không thể phân tích kết quả từ AI');
             }
-            
-            return markers;
         }
 
         function showAISuggestions(suggestions) {
