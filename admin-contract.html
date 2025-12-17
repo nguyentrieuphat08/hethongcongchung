@@ -2463,19 +2463,76 @@ Trả về JSON array (KHÔNG markdown code block):
             const data = await response.json();
             const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
             
+            console.log('AI Response:', responseText);
+            
             // Parse JSON from response
             try {
-                let jsonStr = responseText;
-                if (responseText.includes('```json')) {
-                    jsonStr = responseText.split('```json')[1].split('```')[0];
-                } else if (responseText.includes('```')) {
-                    jsonStr = responseText.split('```')[1].split('```')[0];
+                let jsonStr = responseText.trim();
+                
+                // Xử lý các trường hợp markdown code block
+                if (jsonStr.includes('```json')) {
+                    jsonStr = jsonStr.split('```json')[1].split('```')[0];
+                } else if (jsonStr.includes('```')) {
+                    jsonStr = jsonStr.split('```')[1].split('```')[0];
                 }
-                return JSON.parse(jsonStr.trim());
+                
+                // Tìm array JSON trong text
+                const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
+                if (arrayMatch) {
+                    jsonStr = arrayMatch[0];
+                }
+                
+                const result = JSON.parse(jsonStr.trim());
+                console.log('Parsed result:', result);
+                return result;
             } catch (e) {
-                console.error('Parse error:', e, responseText);
-                throw new Error('Không thể phân tích kết quả từ AI');
+                console.error('Parse error:', e);
+                console.error('Response text:', responseText);
+                
+                // Nếu không parse được, thử tạo suggestions từ pattern cơ bản
+                const fallbackSuggestions = extractBasicPatterns(documentText);
+                if (fallbackSuggestions.length > 0) {
+                    console.log('Using fallback suggestions:', fallbackSuggestions);
+                    return fallbackSuggestions;
+                }
+                
+                throw new Error('Không thể phân tích kết quả từ AI. Vui lòng thử lại.');
             }
+        }
+        
+        // Fallback: tự extract patterns nếu AI không trả về đúng format
+        function extractBasicPatterns(text) {
+            const patterns = [
+                { regex: /Ông:\s*[\.…_]+/g, field: 'ten_ben_a', label: 'Họ tên bên A', sampleData: 'Nguyễn Văn A' },
+                { regex: /Bà:\s*[\.…_]+/g, field: 'ten_ben_a', label: 'Họ tên bên A', sampleData: 'Nguyễn Thị B' },
+                { regex: /CMND số:\s*[\.…_]+/g, field: 'cmnd_ben_a', label: 'Số CMND bên A', sampleData: '001234567890' },
+                { regex: /CCCD số:\s*[\.…_]+/g, field: 'cccd_ben_a', label: 'Số CCCD bên A', sampleData: '001234567890' },
+                { regex: /Địa chỉ:\s*[\.…_]+/g, field: 'dia_chi_ben_a', label: 'Địa chỉ bên A', sampleData: '123 Đường ABC, Quận 1' },
+                { regex: /Nơi ĐKTT:\s*[\.…_]+/g, field: 'dktt_ben_a', label: 'Nơi ĐKTT bên A', sampleData: '123 Đường ABC, Quận 1' },
+                { regex: /cấp ngày:\s*[\.…_]+/g, field: 'ngay_cap_ben_a', label: 'Ngày cấp', sampleData: '01/01/2020' },
+                { regex: /Cơ quan cấp:\s*[\.…_]+/g, field: 'noi_cap_ben_a', label: 'Nơi cấp', sampleData: 'CA TP.HCM' },
+            ];
+            
+            const suggestions = [];
+            const usedFields = new Set();
+            
+            patterns.forEach(p => {
+                const match = text.match(p.regex);
+                if (match && !usedFields.has(p.field)) {
+                    // Extract contextBefore from match
+                    const contextBefore = match[0].replace(/[\.…_]+$/, '');
+                    suggestions.push({
+                        contextBefore: contextBefore,
+                        textToReplace: match[0].replace(contextBefore, ''),
+                        field: p.field,
+                        label: p.label,
+                        sampleData: p.sampleData
+                    });
+                    usedFields.add(p.field);
+                }
+            });
+            
+            return suggestions;
         }
 
         function showAISuggestions(suggestions) {
