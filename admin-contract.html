@@ -2401,41 +2401,64 @@
         }
 
         async function callGeminiAPI(documentText) {
-            const prompt = `Bạn là chuyên gia phân tích hợp đồng Việt Nam. Nhiệm vụ: TÌM các vị trí cần điền thông tin.
+            const prompt = `Bạn là chuyên gia phân tích hợp đồng Việt Nam. Nhiệm vụ: TÌM TẤT CẢ các vị trí cần điền thông tin trong hợp đồng.
 
-CÁCH LÀM:
-1. Đọc văn bản hợp đồng
-2. Tìm các vị trí cần điền thông tin (sau "Ông:", "Bà:", "CMND số:", "Địa chỉ:", v.v.)
-3. Xác định CHÍNH XÁC text ngay trước chỗ cần điền (contextBefore)
-4. Xác định text cần thay thế (thường là "...", "…", "___", hoặc khoảng trắng)
+CÁC LOẠI THÔNG TIN CẦN TÌM:
+1. Ngày tháng năm ký hợp đồng (Hôm nay, ngày...tháng...năm...)
+2. Địa điểm ký hợp đồng
+3. Thông tin BÊN A (bên cho thuê/bán):
+   - Họ tên (sau "Ông:", "Bà:", "Họ và tên:")
+   - Số CMND/CCCD
+   - Cơ quan cấp CMND
+   - Ngày cấp CMND
+   - Nơi ĐKTT/Địa chỉ thường trú
+   - Số điện thoại
+4. Thông tin BÊN B (bên thuê/mua) - tương tự bên A
+5. Thông tin tài sản:
+   - Diện tích đất (m2)
+   - Diện tích nhà (m2)
+   - Địa chỉ tài sản
+   - Số tầng
+6. Thông tin hợp đồng:
+   - Giá thuê/bán
+   - Thời hạn thuê
+   - Tiền đặt cọc
+   - Số tiền bằng chữ
 
-VÍ DỤ PHÂN TÍCH:
-Input: "Ông: ............  CMND số: ............ cấp ngày: ............"
-Output:
-- contextBefore: "Ông: " → field: ten_ben_a, thay "............"
-- contextBefore: "CMND số: " → field: cmnd_ben_a, thay "............"
-- contextBefore: "cấp ngày: " → field: ngay_cap_ben_a, thay "............"
+CÁCH NHẬN DIỆN VỊ TRÍ CẦN ĐIỀN:
+- Có dấu "...", "…", "___", "......." sau label
+- Ví dụ: "Ông: ............" → cần điền họ tên
 
 QUY TẮC ĐẶT TÊN BIẾN:
-- Bên A (bên cho thuê, bên bán): _ben_a
-- Bên B (bên thuê, bên mua): _ben_b  
-- Ngày ký hợp đồng: ngay_ky, thang_ky, nam_ky
-- Địa điểm ký: dia_diem_ky
+- Bên A: ten_ben_a, cmnd_ben_a, noi_cap_ben_a, ngay_cap_ben_a, dktt_ben_a, sdt_ben_a
+- Bên B: ten_ben_b, cmnd_ben_b, noi_cap_ben_b, ngay_cap_ben_b, dktt_ben_b, sdt_ben_b
+- Ngày ký: ngay_ky, thang_ky, nam_ky
+- Địa điểm: dia_diem_ky
+- Tài sản: dien_tich_dat, dien_tich_nha, dia_chi_tai_san, so_tang
+- Hợp đồng: gia_thue, thoi_han, tien_coc, so_tien_chu
 
-QUAN TRỌNG:
-- contextBefore phải CHÍNH XÁC như trong văn bản (bao gồm dấu ":" và khoảng trắng)
-- textToReplace là chuỗi dots hoặc underscores cần thay thế
-
-Hợp đồng:
+Hợp đồng cần phân tích:
 """
-${documentText.substring(0, 12000)}
+${documentText.substring(0, 15000)}
 """
 
-Trả về JSON array (KHÔNG markdown code block):
+YÊU CẦU: Tìm TẤT CẢ vị trí có dấu "...", "…", "___" và trả về JSON array:
 [
+  {"contextBefore": "Hôm nay, ngày", "textToReplace": ".....", "field": "ngay_ky", "label": "Ngày ký", "sampleData": "15"},
+  {"contextBefore": "tháng", "textToReplace": "......", "field": "thang_ky", "label": "Tháng ký", "sampleData": "12"},
+  {"contextBefore": "năm ", "textToReplace": "........", "field": "nam_ky", "label": "Năm ký", "sampleData": "2024"},
   {"contextBefore": "Ông: ", "textToReplace": "............", "field": "ten_ben_a", "label": "Họ tên bên A", "sampleData": "Nguyễn Văn A"},
-  {"contextBefore": "CMND số: ", "textToReplace": "............", "field": "cmnd_ben_a", "label": "Số CMND bên A", "sampleData": "001234567890"}
-]`;
+  {"contextBefore": "CMND số:", "textToReplace": "..............", "field": "cmnd_ben_a", "label": "Số CMND bên A", "sampleData": "001234567890"},
+  {"contextBefore": "Cơ quan cấp:", "textToReplace": "............", "field": "noi_cap_ben_a", "label": "Nơi cấp bên A", "sampleData": "CA TP.HCM"},
+  {"contextBefore": "Ngày cấp:", "textToReplace": "............", "field": "ngay_cap_ben_a", "label": "Ngày cấp bên A", "sampleData": "01/01/2020"},
+  {"contextBefore": "Nơi ĐKTT:", "textToReplace": "............", "field": "dktt_ben_a", "label": "Địa chỉ bên A", "sampleData": "123 ABC, Q1, HCM"}
+]
+
+QUAN TRỌNG: 
+- Tìm TẤT CẢ vị trí, không bỏ sót
+- contextBefore phải CHÍNH XÁC như văn bản gốc
+- Phân biệt rõ Bên A và Bên B
+- Chỉ trả về JSON array, không có text khác`;
 
             const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
                 method: 'POST',
@@ -2508,21 +2531,40 @@ Trả về JSON array (KHÔNG markdown code block):
             // Tìm vị trí BÊN B để phân biệt
             const benBIndex = text.search(/BÊN\s*(THUÊ|MUA|B|NHẬN)/i);
             
-            // Các pattern cơ bản với dots characters
-            const dotsPattern = '[.…_·]{2,}';
+            // Các pattern cơ bản với dots characters - mở rộng để match nhiều loại dots hơn
+            const dotsPattern = '[.…_·•\\-]{2,}';
             
-            // Định nghĩa các loại fields
+            // Định nghĩa các loại fields - MỞ RỘNG
             const fieldTypes = [
-                { keywords: ['Ông:', 'Bà:', 'Họ và tên:', 'Họ tên:'], type: 'ten', label: 'Họ tên', sample: 'Nguyễn Văn A' },
-                { keywords: ['CMND số:', 'CCCD số:', 'Số CMND:', 'Số CCCD:', 'CMND/CCCD:'], type: 'cmnd', label: 'Số CMND/CCCD', sample: '001234567890' },
-                { keywords: ['Cơ quan cấp:', 'cấp tại:', 'nơi cấp:', 'do '], type: 'noi_cap', label: 'Nơi cấp', sample: 'CA TP.HCM' },
+                // Thông tin cá nhân
+                { keywords: ['Ông:', 'Bà:', 'Họ và tên:', 'Họ tên:', 'Tên:'], type: 'ten', label: 'Họ tên', sample: 'Nguyễn Văn A' },
+                { keywords: ['CMND số:', 'CCCD số:', 'Số CMND:', 'Số CCCD:', 'CMND/CCCD:', 'CMND:', 'CCCD:'], type: 'cmnd', label: 'Số CMND/CCCD', sample: '001234567890' },
+                { keywords: ['Cơ quan cấp:', 'cấp tại:', 'nơi cấp:', 'Nơi cấp:'], type: 'noi_cap', label: 'Nơi cấp', sample: 'CA TP.HCM' },
                 { keywords: ['Ngày cấp:', 'cấp ngày:'], type: 'ngay_cap', label: 'Ngày cấp', sample: '01/01/2020' },
-                { keywords: ['Nơi ĐKTT:', 'ĐKTT:', 'Địa chỉ thường trú:'], type: 'dktt', label: 'Nơi ĐKTT', sample: '123 Đường ABC, Quận 1' },
-                { keywords: ['Địa chỉ:'], type: 'dia_chi', label: 'Địa chỉ', sample: '123 Đường ABC, Quận 1' },
-                { keywords: ['SĐT:', 'Điện thoại:', 'Số điện thoại:'], type: 'sdt', label: 'Số điện thoại', sample: '0901234567' },
-                { keywords: ['Hôm nay, ngày', ', ngày'], type: 'ngay_ky', label: 'Ngày ký', sample: '01' },
-                { keywords: ['tháng'], type: 'thang_ky', label: 'Tháng ký', sample: '01' },
-                { keywords: ['năm 20', 'năm '], type: 'nam_ky', label: 'Năm ký', sample: '2024' },
+                { keywords: ['Nơi ĐKTT:', 'ĐKTT:', 'Địa chỉ thường trú:', 'Thường trú:', 'Hộ khẩu:'], type: 'dktt', label: 'Nơi ĐKTT', sample: '123 Đường ABC, Quận 1' },
+                { keywords: ['Địa chỉ:', 'tại địa chỉ:', 'Tại:'], type: 'dia_chi', label: 'Địa chỉ', sample: '123 Đường ABC, Quận 1' },
+                { keywords: ['SĐT:', 'Điện thoại:', 'Số điện thoại:', 'ĐT:', 'Tel:', 'Phone:'], type: 'sdt', label: 'Số điện thoại', sample: '0901234567' },
+                { keywords: ['Sinh năm:', 'Năm sinh:', 'sinh ngày:'], type: 'nam_sinh', label: 'Năm sinh', sample: '1990' },
+                
+                // Ngày tháng ký
+                { keywords: ['Hôm nay, ngày', ', ngày'], type: 'ngay_ky', label: 'Ngày ký', sample: '15', noParty: true },
+                { keywords: ['tháng'], type: 'thang_ky', label: 'Tháng ký', sample: '12', noParty: true },
+                { keywords: ['năm 20', 'năm '], type: 'nam_ky', label: 'Năm ký', sample: '2024', noParty: true },
+                
+                // Địa điểm
+                { keywords: ['tại', 'Tại '], type: 'dia_diem_ky', label: 'Địa điểm ký', sample: 'Hà Nội', noParty: true },
+                
+                // Thông tin tài sản
+                { keywords: ['Diện tích quyền sử dụng đất:', 'Diện tích đất:', 'DT đất:'], type: 'dien_tich_dat', label: 'Diện tích đất', sample: '100', noParty: true },
+                { keywords: ['Diện tích căn nhà:', 'Diện tích nhà:', 'Diện tích xây dựng:', 'DT nhà:'], type: 'dien_tich_nha', label: 'Diện tích nhà', sample: '80', noParty: true },
+                { keywords: ['nhà', 'một căn nhà', 'tầng'], type: 'so_tang', label: 'Số tầng', sample: '3', noParty: true },
+                { keywords: ['địa chỉ', 'tại địa chỉ'], type: 'dia_chi_ts', label: 'Địa chỉ tài sản', sample: '123 ABC, Q1, HCM', noParty: true },
+                
+                // Thông tin hợp đồng
+                { keywords: ['Giá thuê:', 'giá thuê là:', 'Tiền thuê:', 'Giá bán:', 'Tổng giá:'], type: 'gia', label: 'Giá thuê/bán', sample: '10.000.000', noParty: true },
+                { keywords: ['Thời hạn thuê:', 'thời hạn', 'trong thời gian'], type: 'thoi_han', label: 'Thời hạn', sample: '12 tháng', noParty: true },
+                { keywords: ['Tiền đặt cọc:', 'Đặt cọc:', 'tiền cọc:'], type: 'tien_coc', label: 'Tiền đặt cọc', sample: '20.000.000', noParty: true },
+                { keywords: ['Bằng chữ:', 'bằng chữ:'], type: 'so_tien_chu', label: 'Số tiền bằng chữ', sample: 'Mười triệu đồng', noParty: true },
             ];
             
             // Duyệt qua text và tìm tất cả các pattern
@@ -2533,15 +2575,28 @@ Trả về JSON array (KHÔNG markdown code block):
                     const regex = new RegExp(escapedKeyword + '\\s*' + dotsPattern, 'gi');
                     
                     let match;
-                    let matchCount = { a: 0, b: 0 };
+                    let matchCount = { a: 0, b: 0, none: 0 };
                     
                     while ((match = regex.exec(text)) !== null) {
-                        // Xác định bên A hay B dựa vào vị trí
-                        const party = (benBIndex > 0 && match.index > benBIndex) ? 'b' : 'a';
-                        matchCount[party]++;
+                        let fieldName;
+                        let labelSuffix = '';
                         
-                        const suffix = party === 'a' ? '_ben_a' : '_ben_b';
-                        const fieldName = fieldType.type + suffix;
+                        if (fieldType.noParty) {
+                            // Không phân biệt bên
+                            matchCount.none++;
+                            fieldName = fieldType.type;
+                            if (matchCount.none > 1) {
+                                fieldName = fieldType.type + '_' + matchCount.none;
+                            }
+                        } else {
+                            // Xác định bên A hay B dựa vào vị trí
+                            const party = (benBIndex > 0 && match.index > benBIndex) ? 'b' : 'a';
+                            matchCount[party]++;
+                            
+                            const suffix = party === 'a' ? '_ben_a' : '_ben_b';
+                            fieldName = fieldType.type + suffix;
+                            labelSuffix = party === 'a' ? ' bên A' : ' bên B';
+                        }
                         
                         // Tránh duplicate
                         if (!suggestions.some(s => s.field === fieldName)) {
@@ -2550,7 +2605,7 @@ Trả về JSON array (KHÔNG markdown code block):
                                 contextBefore: contextBefore,
                                 textToReplace: match[0].replace(contextBefore, ''),
                                 field: fieldName,
-                                label: fieldType.label + (party === 'a' ? ' bên A' : ' bên B'),
+                                label: fieldType.label + labelSuffix,
                                 sampleData: fieldType.sample
                             });
                         }
