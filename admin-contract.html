@@ -2502,36 +2502,63 @@ Trả về JSON array (KHÔNG markdown code block):
         
         // Fallback: tự extract patterns nếu AI không trả về đúng format
         function extractBasicPatterns(text) {
-            const patterns = [
-                { regex: /Ông:\s*[\.…_]+/g, field: 'ten_ben_a', label: 'Họ tên bên A', sampleData: 'Nguyễn Văn A' },
-                { regex: /Bà:\s*[\.…_]+/g, field: 'ten_ben_a', label: 'Họ tên bên A', sampleData: 'Nguyễn Thị B' },
-                { regex: /CMND số:\s*[\.…_]+/g, field: 'cmnd_ben_a', label: 'Số CMND bên A', sampleData: '001234567890' },
-                { regex: /CCCD số:\s*[\.…_]+/g, field: 'cccd_ben_a', label: 'Số CCCD bên A', sampleData: '001234567890' },
-                { regex: /Địa chỉ:\s*[\.…_]+/g, field: 'dia_chi_ben_a', label: 'Địa chỉ bên A', sampleData: '123 Đường ABC, Quận 1' },
-                { regex: /Nơi ĐKTT:\s*[\.…_]+/g, field: 'dktt_ben_a', label: 'Nơi ĐKTT bên A', sampleData: '123 Đường ABC, Quận 1' },
-                { regex: /cấp ngày:\s*[\.…_]+/g, field: 'ngay_cap_ben_a', label: 'Ngày cấp', sampleData: '01/01/2020' },
-                { regex: /Cơ quan cấp:\s*[\.…_]+/g, field: 'noi_cap_ben_a', label: 'Nơi cấp', sampleData: 'CA TP.HCM' },
+            const suggestions = [];
+            let currentParty = 'a'; // Bắt đầu với bên A
+            
+            // Tìm vị trí BÊN B để phân biệt
+            const benBIndex = text.search(/BÊN\s*(THUÊ|MUA|B|NHẬN)/i);
+            
+            // Các pattern cơ bản với dots characters
+            const dotsPattern = '[.…_·]{2,}';
+            
+            // Định nghĩa các loại fields
+            const fieldTypes = [
+                { keywords: ['Ông:', 'Bà:', 'Họ và tên:', 'Họ tên:'], type: 'ten', label: 'Họ tên', sample: 'Nguyễn Văn A' },
+                { keywords: ['CMND số:', 'CCCD số:', 'Số CMND:', 'Số CCCD:', 'CMND/CCCD:'], type: 'cmnd', label: 'Số CMND/CCCD', sample: '001234567890' },
+                { keywords: ['Cơ quan cấp:', 'cấp tại:', 'nơi cấp:', 'do '], type: 'noi_cap', label: 'Nơi cấp', sample: 'CA TP.HCM' },
+                { keywords: ['Ngày cấp:', 'cấp ngày:'], type: 'ngay_cap', label: 'Ngày cấp', sample: '01/01/2020' },
+                { keywords: ['Nơi ĐKTT:', 'ĐKTT:', 'Địa chỉ thường trú:'], type: 'dktt', label: 'Nơi ĐKTT', sample: '123 Đường ABC, Quận 1' },
+                { keywords: ['Địa chỉ:'], type: 'dia_chi', label: 'Địa chỉ', sample: '123 Đường ABC, Quận 1' },
+                { keywords: ['SĐT:', 'Điện thoại:', 'Số điện thoại:'], type: 'sdt', label: 'Số điện thoại', sample: '0901234567' },
+                { keywords: ['Hôm nay, ngày', ', ngày'], type: 'ngay_ky', label: 'Ngày ký', sample: '01' },
+                { keywords: ['tháng'], type: 'thang_ky', label: 'Tháng ký', sample: '01' },
+                { keywords: ['năm 20', 'năm '], type: 'nam_ky', label: 'Năm ký', sample: '2024' },
             ];
             
-            const suggestions = [];
-            const usedFields = new Set();
-            
-            patterns.forEach(p => {
-                const match = text.match(p.regex);
-                if (match && !usedFields.has(p.field)) {
-                    // Extract contextBefore from match
-                    const contextBefore = match[0].replace(/[\.…_]+$/, '');
-                    suggestions.push({
-                        contextBefore: contextBefore,
-                        textToReplace: match[0].replace(contextBefore, ''),
-                        field: p.field,
-                        label: p.label,
-                        sampleData: p.sampleData
-                    });
-                    usedFields.add(p.field);
-                }
+            // Duyệt qua text và tìm tất cả các pattern
+            fieldTypes.forEach(fieldType => {
+                fieldType.keywords.forEach(keyword => {
+                    // Tạo regex để tìm keyword + dots
+                    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(escapedKeyword + '\\s*' + dotsPattern, 'gi');
+                    
+                    let match;
+                    let matchCount = { a: 0, b: 0 };
+                    
+                    while ((match = regex.exec(text)) !== null) {
+                        // Xác định bên A hay B dựa vào vị trí
+                        const party = (benBIndex > 0 && match.index > benBIndex) ? 'b' : 'a';
+                        matchCount[party]++;
+                        
+                        const suffix = party === 'a' ? '_ben_a' : '_ben_b';
+                        const fieldName = fieldType.type + suffix;
+                        
+                        // Tránh duplicate
+                        if (!suggestions.some(s => s.field === fieldName)) {
+                            const contextBefore = match[0].replace(new RegExp(dotsPattern + '$'), '');
+                            suggestions.push({
+                                contextBefore: contextBefore,
+                                textToReplace: match[0].replace(contextBefore, ''),
+                                field: fieldName,
+                                label: fieldType.label + (party === 'a' ? ' bên A' : ' bên B'),
+                                sampleData: fieldType.sample
+                            });
+                        }
+                    }
+                });
             });
             
+            console.log('Fallback extracted:', suggestions.length, 'patterns');
             return suggestions;
         }
 
