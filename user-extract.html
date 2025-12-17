@@ -297,14 +297,26 @@
         const N8N_EXTRACT_API_OTHER = 'https://demo.vnlawai.com/webhook/giaytokhac';
 
         // State management - CCCD
-        let partiesCCCD = ['A', 'B'];
-        let imagesCCCD = {};
+        // Structure: {party: [person1, person2, ...]}
+        let partiesCCCD = {A: [1], B: [1]};
+        let imagesCCCD = {}; // Key: "A_1", "A_2", "B_1"...
         let extractedDataCCCD = {};
 
-        // State management - Other documents
-        let partiesOther = ['A', 'B'];
+        // State management - Other documents  
+        let partiesOther = {A: [1], B: [1]};
         let imagesOther = {};
         let extractedDataOther = {};
+
+        // Helper to get all party-person keys
+        function getPartyPersonKeys(parties) {
+            const keys = [];
+            Object.entries(parties).forEach(([party, persons]) => {
+                persons.forEach(person => {
+                    keys.push(`${party}_${person}`);
+                });
+            });
+            return keys;
+        }
 
         // Initialize
         window.addEventListener('load', () => {
@@ -322,21 +334,79 @@
             const container = document.getElementById('partiesList');
             container.innerHTML = '';
             
-            partiesCCCD.forEach(party => {
-                const badge = document.createElement('div');
-                badge.className = 'party-badge';
-                badge.innerHTML = `
-                    <span class="fw-semibold">Đương sự ${party}</span>
-                    <span class="remove-party" onclick="removeParty('${party}')" title="Xóa">×</span>
+            Object.entries(partiesCCCD).forEach(([party, persons]) => {
+                const partyDiv = document.createElement('div');
+                partyDiv.className = 'd-flex flex-column gap-1 mb-2';
+                
+                // Party header with add person button
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'd-flex align-items-center gap-2';
+                headerDiv.innerHTML = `
+                    <span class="party-badge">
+                        <span class="fw-semibold">Đương sự ${party}</span>
+                        <span class="remove-party" onclick="removeParty('${party}')" title="Xóa đương sự">×</span>
+                    </span>
+                    <button class="btn btn-sm btn-outline-success" onclick="addPerson('${party}')" title="Thêm người">
+                        <i class="bi bi-person-plus"></i>
+                    </button>
                 `;
-                container.appendChild(badge);
+                partyDiv.appendChild(headerDiv);
+                
+                // List of persons
+                if (persons.length > 1) {
+                    const personsDiv = document.createElement('div');
+                    personsDiv.className = 'd-flex gap-1 flex-wrap ms-3';
+                    persons.forEach(person => {
+                        personsDiv.innerHTML += `
+                            <span class="badge bg-light text-dark border">
+                                Người ${person}
+                                ${persons.length > 1 ? `<span class="text-danger ms-1" style="cursor:pointer" onclick="removePerson('${party}', ${person})">×</span>` : ''}
+                            </span>
+                        `;
+                    });
+                    partyDiv.appendChild(personsDiv);
+                }
+                
+                container.appendChild(partyDiv);
             });
         }
 
+        function addPerson(party) {
+            const maxPerson = Math.max(...partiesCCCD[party], 0);
+            partiesCCCD[party].push(maxPerson + 1);
+            partiesOther[party] = [...partiesCCCD[party]];
+            renderParties();
+            renderUploadAreaCCCD();
+            renderUploadAreaOther();
+        }
+
+        function removePerson(party, person) {
+            if (partiesCCCD[party].length <= 1) {
+                alert('Phải có ít nhất 1 người trong mỗi đương sự!');
+                return;
+            }
+            if (confirm(`Xóa Người ${person} của Đương sự ${party}?`)) {
+                partiesCCCD[party] = partiesCCCD[party].filter(p => p !== person);
+                partiesOther[party] = [...partiesCCCD[party]];
+                const key = `${party}_${person}`;
+                delete imagesCCCD[key];
+                delete imagesOther[key];
+                delete extractedDataCCCD[key];
+                delete extractedDataOther[key];
+                renderParties();
+                renderUploadAreaCCCD();
+                renderUploadAreaOther();
+            }
+        }
+
         function setDefaultParties(num) {
-            const parties = Array.from({length: num}, (_, i) => String.fromCharCode(65 + i));
-            partiesCCCD = [...parties];
-            partiesOther = [...parties];
+            partiesCCCD = {};
+            partiesOther = {};
+            for (let i = 0; i < num; i++) {
+                const party = String.fromCharCode(65 + i);
+                partiesCCCD[party] = [1];
+                partiesOther[party] = [1];
+            }
             imagesCCCD = {};
             imagesOther = {};
             extractedDataCCCD = {};
@@ -349,20 +419,20 @@
 
         function addParty() {
             const input = document.getElementById('newPartyInput');
-            const newParty = input.value.trim();
+            const newParty = input.value.trim().toUpperCase();
             
             if (!newParty) {
                 alert('Vui lòng nhập tên đương sự!');
                 return;
             }
             
-            if (partiesCCCD.includes(newParty)) {
+            if (partiesCCCD[newParty]) {
                 alert('Tên đương sự đã tồn tại!');
                 return;
             }
             
-            partiesCCCD.push(newParty);
-            partiesOther.push(newParty);
+            partiesCCCD[newParty] = [1];
+            partiesOther[newParty] = [1];
             input.value = '';
             renderParties();
             renderUploadAreaCCCD();
@@ -370,18 +440,22 @@
         }
 
         function removeParty(party) {
-            if (partiesCCCD.length <= 1) {
+            if (Object.keys(partiesCCCD).length <= 1) {
                 alert('Phải có ít nhất 1 đương sự!');
                 return;
             }
             
-            if (confirm(`Bạn có chắc muốn xóa đương sự ${party}?`)) {
-                partiesCCCD = partiesCCCD.filter(p => p !== party);
-                partiesOther = partiesOther.filter(p => p !== party);
-                delete imagesCCCD[party];
-                delete imagesOther[party];
-                delete extractedDataCCCD[party];
-                delete extractedDataOther[party];
+            if (confirm(`Bạn có chắc muốn xóa đương sự ${party} và tất cả người trong đó?`)) {
+                // Remove all person keys for this party
+                partiesCCCD[party].forEach(person => {
+                    const key = `${party}_${person}`;
+                    delete imagesCCCD[key];
+                    delete imagesOther[key];
+                    delete extractedDataCCCD[key];
+                    delete extractedDataOther[key];
+                });
+                delete partiesCCCD[party];
+                delete partiesOther[party];
                 renderParties();
                 renderUploadAreaCCCD();
                 renderUploadAreaOther();
@@ -393,44 +467,59 @@
             const container = document.getElementById('uploadAreaCCCD');
             container.innerHTML = '';
             
-            partiesCCCD.forEach(party => {
-                const partyCard = document.createElement('div');
-                partyCard.className = 'party-card p-3 rounded mb-3';
+            Object.entries(partiesCCCD).forEach(([party, persons]) => {
+                const partySection = document.createElement('div');
+                partySection.className = 'mb-4';
                 
-                const header = document.createElement('div');
-                header.className = 'd-flex justify-content-between align-items-center mb-3';
-                header.innerHTML = `
-                    <h6 class="mb-0 fw-bold">Đương sự ${party}</h6>
-                    <span class="badge bg-primary">${imagesCCCD[party] ? imagesCCCD[party].length : 0} ảnh</span>
-                `;
+                const partyHeader = document.createElement('h6');
+                partyHeader.className = 'fw-bold text-primary mb-3';
+                partyHeader.innerHTML = `<i class="bi bi-people-fill me-2"></i>Đương sự ${party}`;
+                partySection.appendChild(partyHeader);
                 
-                const imageGrid = document.createElement('div');
-                imageGrid.className = 'image-grid';
-                imageGrid.id = `imageGridCCCD_${party}`;
-                
-                partyCard.appendChild(header);
-                partyCard.appendChild(imageGrid);
-                container.appendChild(partyCard);
-                
-                renderImagesCCCD(party);
+                persons.forEach(person => {
+                    const key = `${party}_${person}`;
+                    const personCard = document.createElement('div');
+                    personCard.className = 'party-card p-3 rounded mb-2';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'd-flex justify-content-between align-items-center mb-3';
+                    header.innerHTML = `
+                        <span class="fw-semibold">
+                            <i class="bi bi-person-fill me-1"></i>
+                            ${persons.length > 1 ? `Người ${person}` : `Đương sự ${party}`}
+                        </span>
+                        <span class="badge bg-primary">${imagesCCCD[key] ? imagesCCCD[key].length : 0} ảnh</span>
+                    `;
+                    
+                    const imageGrid = document.createElement('div');
+                    imageGrid.className = 'image-grid';
+                    imageGrid.id = `imageGridCCCD_${key}`;
+                    
+                    personCard.appendChild(header);
+                    personCard.appendChild(imageGrid);
+                    partySection.appendChild(personCard);
+                    
+                    container.appendChild(partySection);
+                    renderImagesCCCD(key);
+                });
             });
             
             updateExtractButtonCCCD();
         }
 
-        function renderImagesCCCD(party) {
-            const grid = document.getElementById(`imageGridCCCD_${party}`);
+        function renderImagesCCCD(key) {
+            const grid = document.getElementById(`imageGridCCCD_${key}`);
             if (!grid) return;
             
             grid.innerHTML = '';
-            const partyImages = imagesCCCD[party] || [];
+            const images = imagesCCCD[key] || [];
             
-            partyImages.forEach((image, index) => {
+            images.forEach((image, index) => {
                 const imageItem = document.createElement('div');
                 imageItem.className = 'image-item';
                 imageItem.innerHTML = `
                     <img src="${image.dataUrl}" alt="Ảnh ${index + 1}">
-                    <button class="btn btn-sm btn-danger remove-btn" onclick="removeImageCCCD('${party}', ${index})">
+                    <button class="btn btn-sm btn-danger remove-btn" onclick="removeImageCCCD('${key}', ${index})">
                         <i class="bi bi-x-lg"></i>
                     </button>
                     <div class="image-label">Ảnh ${index + 1}</div>
@@ -441,7 +530,7 @@
             const addBtn = document.createElement('label');
             addBtn.className = 'add-image-btn';
             addBtn.innerHTML = `
-                <input type="file" style="display: none;" onchange="handleImageUploadCCCD('${party}', this)">
+                <input type="file" style="display: none;" onchange="handleImageUploadCCCD('${key}', this)">
                 <div class="text-center">
                     <i class="bi bi-plus-lg" style="font-size: 24px; color: #6c757d;"></i>
                     <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">Thêm ảnh</div>
@@ -450,7 +539,7 @@
             grid.appendChild(addBtn);
         }
 
-        function handleImageUploadCCCD(party, input) {
+        function handleImageUploadCCCD(key, input) {
             const file = input.files[0];
             if (!file) return;
             
@@ -462,37 +551,38 @@
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                if (!imagesCCCD[party]) {
-                    imagesCCCD[party] = [];
+                if (!imagesCCCD[key]) {
+                    imagesCCCD[key] = [];
                 }
                 
-                imagesCCCD[party].push({
+                imagesCCCD[key].push({
                     file: file,
                     dataUrl: e.target.result,
                     base64: e.target.result.split(',')[1]
                 });
                 
-                renderImagesCCCD(party);
+                renderImagesCCCD(key);
                 updateExtractButtonCCCD();
             };
             reader.readAsDataURL(file);
             input.value = '';
         }
 
-        function removeImageCCCD(party, index) {
-            if (imagesCCCD[party]) {
-                imagesCCCD[party].splice(index, 1);
-                if (imagesCCCD[party].length === 0) {
-                    delete imagesCCCD[party];
+        function removeImageCCCD(key, index) {
+            if (imagesCCCD[key]) {
+                imagesCCCD[key].splice(index, 1);
+                if (imagesCCCD[key].length === 0) {
+                    delete imagesCCCD[key];
                 }
-                renderImagesCCCD(party);
+                renderImagesCCCD(key);
                 updateExtractButtonCCCD();
             }
         }
 
         function updateExtractButtonCCCD() {
             const extractBtn = document.getElementById('extractBtnCCCD');
-            const canExtract = partiesCCCD.some(party => imagesCCCD[party] && imagesCCCD[party].length >= 1);
+            const keys = getPartyPersonKeys(partiesCCCD);
+            const canExtract = keys.some(key => imagesCCCD[key] && imagesCCCD[key].length >= 1);
             extractBtn.disabled = !canExtract;
         }
 
@@ -503,18 +593,19 @@
             
             try {
                 extractedDataCCCD = {};
+                const keys = getPartyPersonKeys(partiesCCCD);
                 
-                for (const party of partiesCCCD) {
-                    const partyImages = imagesCCCD[party] || [];
+                for (const key of keys) {
+                    const keyImages = imagesCCCD[key] || [];
                     
-                    if (partyImages.length >= 1) {
-                        const data = await callN8nExtractAPI(party, partyImages, 'CCCD');
-                        extractedDataCCCD[party] = data;
+                    if (keyImages.length >= 1) {
+                        const data = await callN8nExtractAPI(key, keyImages, 'CCCD');
+                        extractedDataCCCD[key] = data;
                     }
                 }
                 
                 if (Object.keys(extractedDataCCCD).length === 0) {
-                    alert('Vui lòng upload ít nhất 1 ảnh cho mỗi đương sự!');
+                    alert('Vui lòng upload ít nhất 1 ảnh!');
                 } else {
                     displayExtractedDataCCCD();
                 }
@@ -531,48 +622,57 @@
             const container = document.getElementById('extractedDataContainerCCCD');
             container.innerHTML = '';
             
-            partiesCCCD.forEach(party => {
-                if (extractedDataCCCD[party]) {
-                    const data = extractedDataCCCD[party];
-                    const card = document.createElement('div');
-                    card.className = 'border rounded p-3 mb-3';
-                    card.innerHTML = `
-                        <h6 class="fw-bold text-success mb-3">
-                            <i class="bi bi-check-circle-fill me-2"></i>Thông tin Đương sự ${party}
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">Họ và tên:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.fullname || ''}" readonly>
+            Object.entries(partiesCCCD).forEach(([party, persons]) => {
+                persons.forEach(person => {
+                    const key = `${party}_${person}`;
+                    if (extractedDataCCCD[key]) {
+                        const data = extractedDataCCCD[key];
+                        const card = document.createElement('div');
+                        card.className = 'border rounded p-3 mb-3';
+                        
+                        // Determine display name
+                        const displayName = persons.length > 1 
+                            ? `Đương sự ${party} - Người ${person}`
+                            : `Đương sự ${party}`;
+                        
+                        card.innerHTML = `
+                            <h6 class="fw-bold text-success mb-3">
+                                <i class="bi bi-check-circle-fill me-2"></i>Thông tin ${displayName}
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">Họ và tên:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${data.fullname || ''}" readonly>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">Ngày sinh:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${data.birthday || ''}" readonly>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">Số CMND/CCCD:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${data.idcard || ''}" readonly>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">Ngày cấp:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${data.issue_date || ''}" readonly>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">Cơ quan cấp:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${data.issuing_authority || ''}" readonly>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">Ngày hết hạn:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${data.expiry_date || ''}" readonly>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">Địa chỉ:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${data.address || ''}" readonly>
+                                </div>
                             </div>
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">Ngày sinh:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.birthday || ''}" readonly>
-                            </div>
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">Số CMND/CCCD:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.idcard || ''}" readonly>
-                            </div>
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">Ngày cấp:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.issue_date || ''}" readonly>
-                            </div>
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">Cơ quan cấp:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.issuing_authority || ''}" readonly>
-                            </div>
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">Ngày hết hạn:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.expiry_date || ''}" readonly>
-                            </div>
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">Địa chỉ:</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.address || ''}" readonly>
-                            </div>
-                        </div>
-                    `;
-                    container.appendChild(card);
-                }
+                        `;
+                        container.appendChild(card);
+                    }
+                });
             });
             
             document.getElementById('extractedInfoCCCD').style.display = 'none';
@@ -618,20 +718,26 @@
             printWindow.document.write('<div class="container mt-4">');
             printWindow.document.write('<h2>Thông tin CCCD/CMND</h2>');
             
-            partiesCCCD.forEach(party => {
-                if (extractedDataCCCD[party]) {
-                    const data = extractedDataCCCD[party];
-                    printWindow.document.write(`<h4 class="mt-4">Đương sự ${party}</h4>`);
-                    printWindow.document.write('<table class="table table-bordered">');
-                    printWindow.document.write('<tr><th>Họ và tên</th><td>' + (data.fullname || '') + '</td></tr>');
-                    printWindow.document.write('<tr><th>Ngày sinh</th><td>' + (data.birthday || '') + '</td></tr>');
-                    printWindow.document.write('<tr><th>Số CMND/CCCD</th><td>' + (data.idcard || '') + '</td></tr>');
-                    printWindow.document.write('<tr><th>Ngày cấp</th><td>' + (data.issue_date || '') + '</td></tr>');
-                    printWindow.document.write('<tr><th>Cơ quan cấp</th><td>' + (data.issuing_authority || '') + '</td></tr>');
-                    printWindow.document.write('<tr><th>Ngày hết hạn</th><td>' + (data.expiry_date || '') + '</td></tr>');
-                    printWindow.document.write('<tr><th>Địa chỉ</th><td>' + (data.address || '') + '</td></tr>');
-                    printWindow.document.write('</table>');
-                }
+            Object.entries(partiesCCCD).forEach(([party, persons]) => {
+                persons.forEach(person => {
+                    const key = `${party}_${person}`;
+                    if (extractedDataCCCD[key]) {
+                        const data = extractedDataCCCD[key];
+                        const displayName = persons.length > 1 
+                            ? `Đương sự ${party} - Người ${person}`
+                            : `Đương sự ${party}`;
+                        printWindow.document.write(`<h4 class="mt-4">${displayName}</h4>`);
+                        printWindow.document.write('<table class="table table-bordered">');
+                        printWindow.document.write('<tr><th>Họ và tên</th><td>' + (data.fullname || '') + '</td></tr>');
+                        printWindow.document.write('<tr><th>Ngày sinh</th><td>' + (data.birthday || '') + '</td></tr>');
+                        printWindow.document.write('<tr><th>Số CMND/CCCD</th><td>' + (data.idcard || '') + '</td></tr>');
+                        printWindow.document.write('<tr><th>Ngày cấp</th><td>' + (data.issue_date || '') + '</td></tr>');
+                        printWindow.document.write('<tr><th>Cơ quan cấp</th><td>' + (data.issuing_authority || '') + '</td></tr>');
+                        printWindow.document.write('<tr><th>Ngày hết hạn</th><td>' + (data.expiry_date || '') + '</td></tr>');
+                        printWindow.document.write('<tr><th>Địa chỉ</th><td>' + (data.address || '') + '</td></tr>');
+                        printWindow.document.write('</table>');
+                    }
+                });
             });
             
             printWindow.document.write('</div>');
@@ -645,44 +751,59 @@
             const container = document.getElementById('uploadAreaOther');
             container.innerHTML = '';
             
-            partiesOther.forEach(party => {
-                const partyCard = document.createElement('div');
-                partyCard.className = 'party-card p-3 rounded mb-3';
+            Object.entries(partiesOther).forEach(([party, persons]) => {
+                const partySection = document.createElement('div');
+                partySection.className = 'mb-4';
                 
-                const header = document.createElement('div');
-                header.className = 'd-flex justify-content-between align-items-center mb-3';
-                header.innerHTML = `
-                    <h6 class="mb-0 fw-bold">Đương sự ${party}</h6>
-                    <span class="badge bg-primary">${imagesOther[party] ? imagesOther[party].length : 0} ảnh</span>
-                `;
+                const partyHeader = document.createElement('h6');
+                partyHeader.className = 'fw-bold text-primary mb-3';
+                partyHeader.innerHTML = `<i class="bi bi-people-fill me-2"></i>Đương sự ${party}`;
+                partySection.appendChild(partyHeader);
                 
-                const imageGrid = document.createElement('div');
-                imageGrid.className = 'image-grid';
-                imageGrid.id = `imageGridOther_${party}`;
-                
-                partyCard.appendChild(header);
-                partyCard.appendChild(imageGrid);
-                container.appendChild(partyCard);
-                
-                renderImagesOther(party);
+                persons.forEach(person => {
+                    const key = `${party}_${person}`;
+                    const personCard = document.createElement('div');
+                    personCard.className = 'party-card p-3 rounded mb-2';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'd-flex justify-content-between align-items-center mb-3';
+                    header.innerHTML = `
+                        <span class="fw-semibold">
+                            <i class="bi bi-person-fill me-1"></i>
+                            ${persons.length > 1 ? `Người ${person}` : `Đương sự ${party}`}
+                        </span>
+                        <span class="badge bg-primary">${imagesOther[key] ? imagesOther[key].length : 0} ảnh</span>
+                    `;
+                    
+                    const imageGrid = document.createElement('div');
+                    imageGrid.className = 'image-grid';
+                    imageGrid.id = `imageGridOther_${key}`;
+                    
+                    personCard.appendChild(header);
+                    personCard.appendChild(imageGrid);
+                    partySection.appendChild(personCard);
+                    
+                    container.appendChild(partySection);
+                    renderImagesOther(key);
+                });
             });
             
             updateExtractButtonOther();
         }
 
-        function renderImagesOther(party) {
-            const grid = document.getElementById(`imageGridOther_${party}`);
+        function renderImagesOther(key) {
+            const grid = document.getElementById(`imageGridOther_${key}`);
             if (!grid) return;
             
             grid.innerHTML = '';
-            const partyImages = imagesOther[party] || [];
+            const images = imagesOther[key] || [];
             
-            partyImages.forEach((image, index) => {
+            images.forEach((image, index) => {
                 const imageItem = document.createElement('div');
                 imageItem.className = 'image-item';
                 imageItem.innerHTML = `
                     <img src="${image.dataUrl}" alt="Ảnh ${index + 1}">
-                    <button class="btn btn-sm btn-danger remove-btn" onclick="removeImageOther('${party}', ${index})">
+                    <button class="btn btn-sm btn-danger remove-btn" onclick="removeImageOther('${key}', ${index})">
                         <i class="bi bi-x-lg"></i>
                     </button>
                     <div class="image-label">Ảnh ${index + 1}</div>
@@ -693,7 +814,7 @@
             const addBtn = document.createElement('label');
             addBtn.className = 'add-image-btn';
             addBtn.innerHTML = `
-                <input type="file" style="display: none;" onchange="handleImageUploadOther('${party}', this)">
+                <input type="file" style="display: none;" onchange="handleImageUploadOther('${key}', this)">
                 <div class="text-center">
                     <i class="bi bi-plus-lg" style="font-size: 24px; color: #6c757d;"></i>
                     <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">Thêm ảnh</div>
@@ -702,7 +823,7 @@
             grid.appendChild(addBtn);
         }
 
-        function handleImageUploadOther(party, input) {
+        function handleImageUploadOther(key, input) {
             const file = input.files[0];
             if (!file) return;
             
@@ -714,37 +835,38 @@
             
             const reader = new FileReader();
             reader.onload = function(e) {
-                if (!imagesOther[party]) {
-                    imagesOther[party] = [];
+                if (!imagesOther[key]) {
+                    imagesOther[key] = [];
                 }
                 
-                imagesOther[party].push({
+                imagesOther[key].push({
                     file: file,
                     dataUrl: e.target.result,
                     base64: e.target.result.split(',')[1]
                 });
                 
-                renderImagesOther(party);
+                renderImagesOther(key);
                 updateExtractButtonOther();
             };
             reader.readAsDataURL(file);
             input.value = '';
         }
 
-        function removeImageOther(party, index) {
-            if (imagesOther[party]) {
-                imagesOther[party].splice(index, 1);
-                if (imagesOther[party].length === 0) {
-                    delete imagesOther[party];
+        function removeImageOther(key, index) {
+            if (imagesOther[key]) {
+                imagesOther[key].splice(index, 1);
+                if (imagesOther[key].length === 0) {
+                    delete imagesOther[key];
                 }
-                renderImagesOther(party);
+                renderImagesOther(key);
                 updateExtractButtonOther();
             }
         }
 
         function updateExtractButtonOther() {
             const extractBtn = document.getElementById('extractBtnOther');
-            const canExtract = partiesOther.some(party => imagesOther[party] && imagesOther[party].length >= 1);
+            const keys = getPartyPersonKeys(partiesOther);
+            const canExtract = keys.some(key => imagesOther[key] && imagesOther[key].length >= 1);
             extractBtn.disabled = !canExtract;
         }
 
@@ -755,18 +877,19 @@
             
             try {
                 extractedDataOther = {};
+                const keys = getPartyPersonKeys(partiesOther);
                 
-                for (const party of partiesOther) {
-                    const partyImages = imagesOther[party] || [];
+                for (const key of keys) {
+                    const keyImages = imagesOther[key] || [];
                     
-                    if (partyImages.length >= 1) {
-                        const data = await callN8nExtractAPI(party, partyImages, 'OTHER');
-                        extractedDataOther[party] = data;
+                    if (keyImages.length >= 1) {
+                        const data = await callN8nExtractAPI(key, keyImages, 'OTHER');
+                        extractedDataOther[key] = data;
                     }
                 }
                 
                 if (Object.keys(extractedDataOther).length === 0) {
-                    alert('Vui lòng upload ít nhất 1 ảnh cho mỗi đương sự!');
+                    alert('Vui lòng upload ít nhất 1 ảnh!');
                 } else {
                     displayExtractedDataOther();
                 }
@@ -783,39 +906,47 @@
             const container = document.getElementById('extractedDataContainerOther');
             container.innerHTML = '';
             
-            partiesOther.forEach(party => {
-                if (extractedDataOther[party]) {
-                    const data = extractedDataOther[party];
-                    const card = document.createElement('div');
-                    card.className = 'border rounded p-3 mb-3';
-                    
-                    let fieldHTML = `
-                        <h6 class="fw-bold text-success mb-3">
-                            <i class="bi bi-check-circle-fill me-2"></i>Thông tin Đương sự ${party}
-                        </h6>
-                        <div class="row">
-                    `;
-                    
-                    // Dynamic fields from n8n response
-                    Object.entries(data).forEach(([key, value]) => {
-                        // Convert camelCase or snake_case to readable label
-                        const label = key
-                            .replace(/([A-Z])/g, ' $1')
-                            .replace(/_/g, ' ')
-                            .replace(/^./, str => str.toUpperCase());
+            Object.entries(partiesOther).forEach(([party, persons]) => {
+                persons.forEach(person => {
+                    const key = `${party}_${person}`;
+                    if (extractedDataOther[key]) {
+                        const data = extractedDataOther[key];
+                        const card = document.createElement('div');
+                        card.className = 'border rounded p-3 mb-3';
                         
-                        fieldHTML += `
-                            <div class="col-md-6 mb-2">
-                                <label class="form-label small text-muted">${label}:</label>
-                                <input type="text" class="form-control form-control-sm" value="${value || ''}" readonly>
-                            </div>
+                        // Determine display name
+                        const displayName = persons.length > 1 
+                            ? `Đương sự ${party} - Người ${person}`
+                            : `Đương sự ${party}`;
+                        
+                        let fieldHTML = `
+                            <h6 class="fw-bold text-success mb-3">
+                                <i class="bi bi-check-circle-fill me-2"></i>Thông tin ${displayName}
+                            </h6>
+                            <div class="row">
                         `;
-                    });
-                    
-                    fieldHTML += '</div>';
-                    card.innerHTML = fieldHTML;
-                    container.appendChild(card);
-                }
+                        
+                        // Dynamic fields from n8n response
+                        Object.entries(data).forEach(([key, value]) => {
+                            // Convert camelCase or snake_case to readable label
+                            const label = key
+                                .replace(/([A-Z])/g, ' $1')
+                                .replace(/_/g, ' ')
+                                .replace(/^./, str => str.toUpperCase());
+                            
+                            fieldHTML += `
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-muted">${label}:</label>
+                                    <input type="text" class="form-control form-control-sm" value="${value || ''}" readonly>
+                                </div>
+                            `;
+                        });
+                        
+                        fieldHTML += '</div>';
+                        card.innerHTML = fieldHTML;
+                        container.appendChild(card);
+                    }
+                });
             });
             
             document.getElementById('extractedInfoOther').style.display = 'none';
