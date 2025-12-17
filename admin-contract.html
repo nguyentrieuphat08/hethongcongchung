@@ -1527,6 +1527,10 @@
                 }
                 updateData.placeholder_mappings = placeholderMappings;
                 contracts[index].placeholderMappings = placeholderMappings;
+                
+                // Save custom placeholders for this contract
+                updateData.custom_placeholders = customPlaceholders;
+                contracts[index].customPlaceholders = customPlaceholders;
             } else {
                 // For PDF: save markers
                 updateData.markers = markers;
