@@ -1072,38 +1072,20 @@
                     }));
                 }
                 
-                // Use proxy for OTHER documents to bypass CORS
-                let response;
-                if (docType === 'OTHER') {
-                    console.log('Using proxy API for OTHER documents');
-                    response = await fetch(PROXY_API, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            webhookUrl: webhookUrl,
-                            party: party,
-                            documentType: docType,
-                            images: images
-                        })
-                    });
-                } else {
-                    response = await fetch(webhookUrl, {
-                        method: 'POST',
-                        mode: 'cors',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            party: party,
-                            documentType: docType,
-                            images: images
-                        })
-                    });
-                }
+                // Gọi trực tiếp webhook cho cả CCCD và giấy tờ khác
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        party: party,
+                        documentType: docType,
+                        images: images
+                    })
+                });
                 
                 console.log('Response status:', response.status);
                 
