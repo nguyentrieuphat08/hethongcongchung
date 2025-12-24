@@ -295,6 +295,7 @@
         // N8N API Configuration
         const N8N_EXTRACT_API_CCCD = 'https://demo.vnlawai.com/webhook/cccd';
         const N8N_EXTRACT_API_OTHER = 'https://demo.vnlawai.com/webhook/giaytokhac';
+        const PROXY_API = '/api/proxy-n8n';
 
         // State management - CCCD
         // Structure: {party: [person1, person2, ...]}
@@ -1020,9 +1021,9 @@
         async function callN8nExtractAPI(party, partyImages, docType = 'CCCD') {
             try {
                 // Select appropriate webhook based on document type
-                const apiUrl = docType === 'OTHER' ? N8N_EXTRACT_API_OTHER : N8N_EXTRACT_API_CCCD;
+                const webhookUrl = docType === 'OTHER' ? N8N_EXTRACT_API_OTHER : N8N_EXTRACT_API_CCCD;
                 
-                console.log('Calling API:', apiUrl, 'DocType:', docType, 'Party:', party);
+                console.log('Calling webhook:', webhookUrl, 'DocType:', docType, 'Party:', party);
                 
                 // Send original images without compression
                 const images = partyImages.map((img) => ({
@@ -1030,19 +1031,38 @@
                     base64: img.base64
                 }));
                 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        party: party,
-                        documentType: docType,
-                        images: images
-                    })
-                });
+                // Use proxy for OTHER documents to bypass CORS
+                let response;
+                if (docType === 'OTHER') {
+                    console.log('Using proxy API for OTHER documents');
+                    response = await fetch(PROXY_API, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            webhookUrl: webhookUrl,
+                            party: party,
+                            documentType: docType,
+                            images: images
+                        })
+                    });
+                } else {
+                    response = await fetch(webhookUrl, {
+                        method: 'POST',
+                        mode: 'cors',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            party: party,
+                            documentType: docType,
+                            images: images
+                        })
+                    });
+                }
                 
                 console.log('Response status:', response.status);
                 
