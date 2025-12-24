@@ -1,4 +1,6 @@
 // Proxy API to call n8n webhooks (bypass CORS)
+const https = require('https');
+
 module.exports = async (req, res) => {
     // Enable CORS
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -30,35 +32,73 @@ module.exports = async (req, res) => {
 
         console.log('Proxying request to:', webhookUrl, 'Party:', party, 'DocType:', documentType);
 
-        // Forward request to n8n webhook
-        const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                party: party,
-                documentType: documentType,
-                images: images
-            })
+        // Prepare request body
+        const requestBody = JSON.stringify({
+            party: party,
+            documentType: documentType,
+            images: images
         });
 
-        console.log('N8n response status:', response.status);
+        // Parse webhook URL
+        const url = new URL(webhookUrl);
+        
+        // Make request using https module
+        const data = await new Promise((resolve, reject) => {
+            const options = {
+                hostname: url.hostname,
+                port: 443,
+                path: url.pathname,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Content-Length': Buffer.byteLength(requestBody)
+                }
+            };
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('N8n error:', errorText);
-            return res.status(response.status).json({ 
-                error: 'N8n webhook error',
-                message: errorText || `Status ${response.status}`
+            const request = https.request(options, (response) => {
+                let responseData = '';
+                
+                response.on('data', (chunk) => {
+                    responseData += chunk;
+                });
+                
+                response.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(responseData);
+                        if (response.statusCode >= 200 && response.statusCode < 300) {
+                            resolve(parsed);
+                        } else {
+                            reject({ status: response.statusCode, data: parsed });
+                        }
+                    } catch (e) {
+                        if (response.statusCode >= 200 && response.statusCode < 300) {
+                            resolve({ raw: responseData });
+                        } else {
+                            reject({ status: response.statusCode, message: responseData });
+                        }
+                    }
+                });
             });
-        }
 
-        const data = await response.json();
+            request.on('error', (error) => {
+                reject({ message: error.message });
+            });
+
+            request.write(requestBody);
+            request.end();
+        });
+
+        console.log('N8n response received');
         return res.status(200).json(data);
     } catch (error) {
         console.error('Proxy error:', error);
+        if (error.status) {
+            return res.status(error.status).json({ 
+                error: 'N8n webhook error',
+                message: error.message || JSON.stringify(error.data)
+            });
+        }
         return res.status(500).json({ 
             error: 'Proxy error',
             message: error.message 
