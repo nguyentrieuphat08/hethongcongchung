@@ -1022,6 +1022,8 @@
                 // Select appropriate webhook based on document type
                 const apiUrl = docType === 'OTHER' ? N8N_EXTRACT_API_OTHER : N8N_EXTRACT_API_CCCD;
                 
+                console.log('Calling API:', apiUrl, 'DocType:', docType, 'Party:', party);
+                
                 // Send original images without compression
                 const images = partyImages.map((img) => ({
                     name: img.file.name,
@@ -1030,8 +1032,10 @@
                 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
+                    mode: 'cors',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         party: party,
@@ -1040,11 +1044,16 @@
                     })
                 });
                 
+                console.log('Response status:', response.status);
+                
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', errorText);
                     throw new Error(`API request failed with status ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log('API Response:', data);
                 
                 if (data.success === false) {
                     throw new Error(data.message || 'API returned error');
@@ -1053,6 +1062,9 @@
                 return data.data || data;
             } catch (error) {
                 console.error('Error calling extract API:', error);
+                if (error.message === 'Failed to fetch') {
+                    throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra: 1) Webhook đã được kích hoạt trong n8n, 2) Kết nối mạng');
+                }
                 throw error;
             }
         }
